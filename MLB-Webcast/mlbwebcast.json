@@ -12,7 +12,7 @@
   "quality": "1080p",
   "baseUrl": "https://mlbwebcast.com",
   "searchBaseUrl": "https://mlbwebcast.com",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/MLB-Webcast/refs/heads/main/mlbwebcast.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/MLB-Webcast/mlbwebcast.js",
   "asyncJS": true,
   "type": "live",
   "softsub": true,
