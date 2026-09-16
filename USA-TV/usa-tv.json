@@ -12,7 +12,7 @@
   "quality": "1080p",
   "baseUrl": "https://848b3516657c-usatv.baby-beamup.club/",
   "searchBaseUrl": "https://848b3516657c-usatv.baby-beamup.club/",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/USA-TV/refs/heads/main/usa-tv.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/USA-TV/usa-tv.js",
   "asyncJS": true,
   "type": "live",
   "softsub": true,
