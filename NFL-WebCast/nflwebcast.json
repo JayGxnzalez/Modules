@@ -12,7 +12,7 @@
   "quality": "1080p",
   "baseUrl": "https://nflwebcast.com",
   "searchBaseUrl": "https://nflwebcast.com",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/NFL-Webcast/refs/heads/main/nflwebcast.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/NFL-Webcast/nflwebcast.js",
   "asyncJS": true,
   "type": "live",
   "softsub": true,
