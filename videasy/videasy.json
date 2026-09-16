@@ -1,0 +1,22 @@
+{
+  "sourceName": "VidEasy",
+  "iconUrl": "https://www.videasy.net/logo.png",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400"
+  },
+  "version": "1.0.0",
+  "language": "English",
+  "languageType": [
+    "Native"
+  ],
+  "streamType": "HLS",
+  "quality": "4K",
+  "baseUrl": "https://player.videasy.net/",
+  "searchBaseUrl": "https://player.videasy.net/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/videasy/refs/heads/main/videasy.js",
+  "type": "shows/movies/anime",
+  "asyncJS": true,
+  "softsub": true,
+  "downloadSupport": false
+}
