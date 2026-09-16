@@ -1,0 +1,20 @@
+{
+  "sourceName": "AllManga (DUB)",
+  "iconUrl": "https://allmanga.to/pics/avatar-w.png",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.3.3",
+  "language": "English",
+  "streamType": "HLS",
+  "quality": "1080p",
+  "baseUrl": "https://allmanga.to/",
+  "searchBaseUrl": "https://allmanga.to/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/AllManga-DUB/refs/heads/main/allmanga-dub.js",
+  "type": "anime",
+  "downloadSupport": true,
+  "asyncJS": true,
+  "softsub": true
+}
