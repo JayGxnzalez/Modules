@@ -1,6 +1,6 @@
 {
   "sourceName": "NFL WebCast",
-  "iconUrl": "https://github.com/JayGxnzalez/NFL-Webcast/blob/main/Icon.png?raw=true",
+  "iconUrl": "https://github.com/JayGxnzalez/Modules/NFL-Webcast/blob/main/Icon.png?raw=true",
   "author": {
     "name": "Jay",
     "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
@@ -12,7 +12,7 @@
   "quality": "1080p",
   "baseUrl": "https://nflwebcast.com",
   "searchBaseUrl": "https://nflwebcast.com",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/NFL-Webcast/refs/heads/main/nflwebcast.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/NFL-Webcast/refs/heads/main/nflwebcast.js",
   "asyncJS": true,
   "type": "live",
   "softsub": true,
