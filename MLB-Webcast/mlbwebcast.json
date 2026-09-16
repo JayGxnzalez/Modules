@@ -1,0 +1,27 @@
+{
+  "sourceName": "MLB WebCast",
+  "iconUrl": "https://github.com/JayGxnzalez/MLB-Webcast/blob/main/MLBWC.png?raw=true",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.0.2",
+  "language": "English",
+  "streamType": "HLS",
+  "quality": "1080p",
+  "baseUrl": "https://mlbwebcast.com",
+  "searchBaseUrl": "https://mlbwebcast.com",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/MLB-Webcast/refs/heads/main/mlbwebcast.js",
+  "asyncJS": true,
+  "type": "live",
+  "softsub": true,
+  "downloadSupport": false,
+  "supportsMojuru": true,
+  "supportsDartotsu": true,
+  "supportsSora": true,
+  "supportsLuna": true,
+  "supportsAnymex": true,
+  "supportsTsumi": true,
+  "supportsHiyoku": true
+}
