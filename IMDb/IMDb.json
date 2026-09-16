@@ -1,0 +1,20 @@
+{
+  "sourceName": "IMDb",
+  "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/IMDb/refs/heads/main/Icon.png",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.0.1",
+  "language": "English",
+  "streamType": "HLS",
+  "quality": "1080",
+  "baseUrl": "https://imdb.su/",
+  "searchBaseUrl": "https://imdb.su/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/IMDb/refs/heads/main/IMDb.js",
+  "type": "Movie/TV",
+  "downloadSupport": true,
+  "asyncJS": true,
+  "softsub": true
+}
