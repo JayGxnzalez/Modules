@@ -1,0 +1,20 @@
+{
+    "sourceName": "Animepahe (SUB)",
+    "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/Animepahe-DUB/refs/heads/main/Icon.png",
+    "author": {
+        "name": "Jay",
+        "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+        "url": "https://github.com/JayGxnzalez"
+    },
+    "version": "1.0.2",
+    "language": "English",
+    "streamType": "HLS",
+    "quality": "1080p",
+    "baseUrl": "https://animepahe.com/",
+    "searchBaseUrl": "https://animepahe.com/search?query=%s",
+    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Animepahe-SUB/refs/heads/main/Animepahe-Sub.js",
+    "type": "anime",
+    "downloadSupport": true,
+    "asyncJS": true,
+    "softsub": false
+}
