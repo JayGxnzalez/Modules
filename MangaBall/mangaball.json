@@ -1,0 +1,14 @@
+{
+  "sourceName": "MangaBall",
+  "iconURL": "https://raw.githubusercontent.com/JayGxnzalez/MangaBall/refs/heads/main/Icon.png",
+  "version": "1.0.2",
+  "language": "English",
+  "scriptURL": "https://raw.githubusercontent.com/JayGxnzalez/MangaBall/refs/heads/main/mangaball.js",
+  "author": {
+    "name": "Jay",
+    "iconURL": "https://avatars.githubusercontent.com/JayGxnzalez?s=400"
+  },
+  "type": "mangas",
+  "supportsShirox": true,
+  "supportsLuna": true
+}
