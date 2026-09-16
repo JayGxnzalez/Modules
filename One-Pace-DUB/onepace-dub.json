@@ -1,6 +1,6 @@
 {
     "sourceName": "One Pace (DUB)",
-    "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/One-Pace-DUB/main/One_Pace_Logo.png",
+    "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/One-Pace-DUB/main/One_Pace_Logo.png",
     "author": {
         "name": "Jay",
         "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
@@ -12,7 +12,7 @@
     "quality": "480p - 720p - 1080p",
     "baseUrl": "https://pixeldrain.net/",
     "searchBaseUrl": "https://onepace.net/en/watch",
-    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/One-Pace-DUB/refs/heads/main/onepace-dub.js",
+    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/One-Pace-DUB/refs/heads/main/onepace-dub.js",
     "type": "anime",
     "asyncJS": true,
     "downloadSupport": true,
