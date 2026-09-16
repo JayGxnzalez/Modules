@@ -1,6 +1,6 @@
 {
     "sourceName": "Animepahe (DUB)",
-    "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/Animepahe-DUB/refs/heads/main/Icon.png",
+    "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/Animepahe-DUB/refs/heads/main/Icon.png",
     "author": {
         "name": "Jay",
         "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
@@ -12,7 +12,7 @@
     "quality": "1080p",
     "baseUrl": "https://animepahe.com/",
     "searchBaseUrl": "https://animepahe.com/search?query=%s",
-    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Animepahe-DUB/refs/heads/main/Animepahe-Dub.js",
+    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/Animepahe-DUB/refs/heads/main/Animepahe-Dub.js",
     "type": "anime",
     "downloadSupport": true,
     "asyncJS": true,
