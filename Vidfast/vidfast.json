@@ -12,7 +12,7 @@
   "quality": "1080, 4K",
   "baseUrl": "https://vidfast.pro/",
   "searchBaseUrl": "https://vidfast.pro/",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Vidfast/refs/heads/main/vidfast.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/Vidfast/refs/heads/main/vidfast.js",
   "type": "Movie/TV",
   "downloadSupport": true,
   "asyncJS": true,
