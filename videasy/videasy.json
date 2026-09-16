@@ -14,7 +14,7 @@
   "quality": "4K",
   "baseUrl": "https://player.videasy.net/",
   "searchBaseUrl": "https://player.videasy.net/",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/videasy/refs/heads/main/videasy.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/videasy/videasy.js",
   "type": "shows/movies/anime",
   "asyncJS": true,
   "softsub": true,
