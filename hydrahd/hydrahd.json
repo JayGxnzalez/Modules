@@ -1,0 +1,25 @@
+{
+  "sourceName": "HydraHD",
+  "iconUrl": "https://hydrahd.ru/fav-192.png",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.0.4",
+  "language": "English",
+  "languageType": [
+    "Native"
+  ],
+  "streamType": "HLS/MP4",
+  "quality": "1080/4K",
+  "baseUrl": "https://hydrahd.ws/",
+  "searchBaseUrl": "https://hydrahd.ws/index.php?menu=search&query=%s",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/hydrahd/refs/heads/main/hydrahd.js",
+  "type": "movies/shows/anime",
+  "downloadSupport": true,
+  "combo": false,
+  "asyncJS": true,
+  "streamAsyncJS": false,
+  "softsub": true
+}
