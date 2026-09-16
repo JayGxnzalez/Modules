@@ -1,0 +1,13 @@
+{
+  "sourceName": "ReadFreeComicsOnline",
+  "iconURL": "https://www.google.com/s2/favicons?sz=128&domain=readfreecomicsonline.com",
+  "version": "1.0.2",
+  "language": "English",
+  "scriptURL": "https://raw.githubusercontent.com/JayGxnzalez/ReadFreeComicsOnline/refs/heads/main/readfreecomicsonline.js",
+  "author": {
+    "name": "Jay",
+    "iconURL": "https://avatars.githubusercontent.com/JayGxnzalez?s=400"
+  },
+  "type": "mangas",
+  "supportsShirox": true
+}
