@@ -12,7 +12,7 @@
     "quality": "1080p",
     "baseUrl": "https://animepahe.com/",
     "searchBaseUrl": "https://animepahe.com/search?query=%s",
-    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/Animepahe-DUB/refs/heads/main/Animepahe-Dub.js",
+    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/Animepahe-DUB/Animepahe-Dub.js",
     "type": "anime",
     "downloadSupport": true,
     "asyncJS": true,
