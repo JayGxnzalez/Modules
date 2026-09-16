@@ -1,0 +1,20 @@
+{
+  "sourceName": "VidFast",
+  "iconUrl": "https://www.google.com/s2/favicons?domain=vidfast.pro&sz=128",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.3.2",
+  "language": "English",
+  "streamType": "HLS",
+  "quality": "1080, 4K",
+  "baseUrl": "https://vidfast.pro/",
+  "searchBaseUrl": "https://vidfast.pro/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Vidfast/refs/heads/main/vidfast.js",
+  "type": "Movie/TV",
+  "downloadSupport": true,
+  "asyncJS": true,
+  "softsub": true
+}
