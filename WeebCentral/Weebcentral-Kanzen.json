@@ -1,0 +1,13 @@
+{
+  "sourceName": "Weebcentral",
+  "iconURL": "https://favicons.statusgator.com/1bi5zotvuQiK08wI.png",
+  "version": "1.0.2",
+  "language": "English",
+  "scriptURL": "https://raw.githubusercontent.com/JayGxnzalez/Weebcentral-Kanzen/refs/heads/main/Weebcentral-Kanzen.js",
+  "author": {
+    "name": "Jay",
+    "iconURL": "https://avatars.githubusercontent.com/JayGxnzalez?s=400"
+  },
+  "type": "mangas",
+  "supportsLuna": true
+}
