@@ -12,7 +12,7 @@
     "quality": "1080p",
     "baseUrl": "https://anikototv.to/",
     "searchBaseUrl": "https://anikototv.to/search?query=%s",
-    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/Anikoto-DUB/refs/heads/main/anikoto-dub.js",
+    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/Anikoto-DUB/anikoto-dub.js",
     "type": "anime",
     "downloadSupport": true,
     "asyncJS": true,
