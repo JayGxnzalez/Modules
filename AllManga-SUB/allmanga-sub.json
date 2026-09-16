@@ -12,7 +12,7 @@
   "quality": "1080p",
   "baseUrl": "https://allmanga.to/",
   "searchBaseUrl": "https://allmanga.to/",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/AllManga-SUB/refs/heads/main/allmanga-sub.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/AllManga-SUB/allmanga-sub.js",
   "type": "anime",
   "downloadSupport": true,
   "asyncJS": true,
