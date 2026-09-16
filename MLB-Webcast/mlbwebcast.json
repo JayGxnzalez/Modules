@@ -1,6 +1,6 @@
 {
   "sourceName": "MLB WebCast",
-  "iconUrl": "https://github.com/JayGxnzalez/MLB-Webcast/blob/main/MLBWC.png?raw=true",
+  "iconUrl": "https://github.com/JayGxnzalez/Modules/MLB-Webcast/blob/main/MLBWC.png?raw=true",
   "author": {
     "name": "Jay",
     "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
@@ -12,7 +12,7 @@
   "quality": "1080p",
   "baseUrl": "https://mlbwebcast.com",
   "searchBaseUrl": "https://mlbwebcast.com",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/MLB-Webcast/refs/heads/main/mlbwebcast.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/MLB-Webcast/refs/heads/main/mlbwebcast.js",
   "asyncJS": true,
   "type": "live",
   "softsub": true,
