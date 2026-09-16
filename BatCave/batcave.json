@@ -1,0 +1,13 @@
+{
+  "sourceName": "BatCave",
+  "iconURL": "https://raw.githubusercontent.com/JayGxnzalez/BatCave/refs/heads/main/icon.png",
+  "version": "1.0.2",
+  "language": "English",
+  "scriptURL": "https://raw.githubusercontent.com/JayGxnzalez/BatCave/refs/heads/main/batcave.js",
+  "author": {
+    "name": "Jay",
+    "iconURL": "https://avatars.githubusercontent.com/JayGxnzalez?s=400"
+  },
+  "type": "mangas",
+  "supportsShirox": true
+}
