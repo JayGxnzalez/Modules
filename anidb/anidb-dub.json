@@ -12,7 +12,7 @@
     "quality": "1080p",
     "baseUrl": "https://anidb.app/",
     "searchBaseUrl": "https://anidb.app/browse?q=%s&sort=order_top",
-    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/anidb/refs/heads/main/anidb-dub.js",
+    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/anidb/anidb-dub.js",
     "type": "anime",
     "downloadSupport": true,
     "asyncJS": true,
