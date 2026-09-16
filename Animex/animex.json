@@ -12,7 +12,7 @@
   "quality": "1080p",
   "baseUrl": "https://animex.one/",
   "searchBaseUrl": "https://animex.one/search?query=%s",
-  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/Animex/refs/heads/main/animex.js",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/Animex/animex.js",
   "type": "anime",
   "downloadSupport": true,
   "asyncJS": true,
