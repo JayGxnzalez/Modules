@@ -1,0 +1,20 @@
+{
+    "sourceName": "AniBD",
+    "iconUrl": "https://www.google.com/s2/favicons?sz=128&domain=anibd.app",
+    "author": {
+        "name": "Jay",
+        "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+        "url": "https://github.com/JayGxnzalez"
+    },
+    "version": "1.0.0",
+    "language": "English",
+    "streamType": "HLS",
+    "quality": "1080p",
+    "baseUrl": "https://anibd.app/",
+    "searchBaseUrl": "https://anibd.app/?s=%s",
+    "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/anibd/anibd.js",
+    "type": "anime",
+    "downloadSupport": true,
+    "asyncJS": true,
+    "softsub": true
+}
