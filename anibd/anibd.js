@@ -21,6 +21,8 @@ const AB = {
     links:    'https://epeng.animeapps.top/apilink.php?data=',
     // play2 host — apilink.php sometimes returns embed links host-relative
     playOrigin: 'https://playeng.animeapps.top',
+    // drop servers whose m3u8 is dead (e.g. SB 404) so the picker shows only working streams
+    validateStreams: true,
     // sub-only site: server id 10 = "S-sub" in the live page. null = "just take the first".
     subServerId: 10,
 };
@@ -161,8 +163,9 @@ async function extractEpisodes(url) {
 
 // ============================================================================
 // 4) STREAM
-// apilink.php gives the embed list; resolveEmbed() turns each play2.php iframe
-// into a playable url. Sub-only, so no dub/audio filtering.
+// apilink.php gives the embed list; resolveEmbed() turns each play2.php / playsub.php
+// iframe into a playable m3u8 (+ softsub VTT if present). Dead servers (e.g. SB 404)
+// are validated out so only working streams reach the picker. Sub-only, no dub filter.
 // ============================================================================
 async function extractStreamUrl(url) {
     const ref = dec(url);
@@ -185,6 +188,16 @@ async function extractStreamUrl(url) {
         return JSON.stringify({ streams: [], subtitles: [] });
     }
 
+    // resolve every embed first (pre-validation)
+    const resolvedAll = [];
+    for (let i = 0; i < embeds.length; i++) {
+        const em = embeds[i];
+        const serverTag = em.server || ('Server ' + (i + 1));
+        const resolved = await resolveEmbed(em.link, serverTag);
+        if (resolved && resolved.streamUrl) resolvedAll.push(resolved);
+        else console.log('[anibd] unresolved embed [' + serverTag + '] ' + em.link);
+    }
+
     const streams = [];
     const allSubtitles = [];              // pool contract — deduped across every embed
     const seenSubs = {};
@@ -197,20 +210,38 @@ async function extractStreamUrl(url) {
         });
     }
 
-    for (let i = 0; i < embeds.length; i++) {
-        const em = embeds[i];
-        const label = 'SUB - ' + (em.server || ('Server ' + (i + 1)));
-        const resolved = await resolveEmbed(em.link, label);
-        if (resolved && resolved.streamUrl) {
-            streams.push(resolved);
-            poolSubs(resolved.subtitles);
-        } else {
-            console.log('[anibd] unresolved embed [' + label + '] ' + em.link);
+    // keep only servers whose playlist is actually live (SB currently 404s)
+    for (let i = 0; i < resolvedAll.length; i++) {
+        const r = resolvedAll[i];
+        let live = true;
+        if (AB.validateStreams) {
+            const body = await abFetch(r.streamUrl, { 'Referer': (r.headers && r.headers.Referer) || AB.playOrigin + '/' });
+            live = (typeof body === 'string' && body.indexOf('#EXTM3U') !== -1);
+            if (!live) console.log('[anibd] dead stream skipped [' + r.title + '] ' + r.streamUrl);
         }
+        if (live) { streams.push(r); poolSubs(r.subtitles); }
     }
 
-    console.log('[anibd] streams=' + streams.length + ' subs=' + allSubtitles.length);
-    return JSON.stringify({ streams: streams, subtitles: allSubtitles });
+    // safety net: never return an empty picker if validation nuked everything
+    // (e.g. a transient fetch failure) — fall back to the unvalidated set.
+    let finalStreams = streams;
+    if (AB.validateStreams && streams.length === 0 && resolvedAll.length > 0) {
+        console.log('[anibd] all failed validation — returning unvalidated set');
+        finalStreams = resolvedAll;
+        resolvedAll.forEach(function (r) { poolSubs(r.subtitles); });
+    }
+
+    // if two live mirrors share a label (e.g. both "SUB - 1080p"), tag them by
+    // server so the picker isn't two identical rows; unique labels stay clean.
+    const counts = {};
+    finalStreams.forEach(function (s) { counts[s.title] = (counts[s.title] || 0) + 1; });
+    finalStreams.forEach(function (s) {
+        if (counts[s.title] > 1 && s.server) s.title = s.title + ' (' + s.server + ')';
+        delete s.server;
+    });
+
+    console.log('[anibd] streams=' + finalStreams.length + ' subs=' + allSubtitles.length);
+    return JSON.stringify({ streams: finalStreams, subtitles: allSubtitles });
 }
 
 // ============================================================================
@@ -222,7 +253,7 @@ async function extractStreamUrl(url) {
 // Because segments are cross-origin, the browser sends only the ORIGIN as
 // Referer — so that's the header the app must replay for the whole stream.
 // ============================================================================
-async function resolveEmbed(embedUrl, label) {
+async function resolveEmbed(embedUrl, serverTag) {
     // apilink.php is inconsistent: SB comes back absolute, SR often host-relative
     // ("/r2/play2.php?..."). Pin any relative link to the play host first, so BOTH
     // the page fetch and the relative videoUrl absolutize to a real URL the player
@@ -244,7 +275,7 @@ async function resolveEmbed(embedUrl, label) {
         const seg = emAbs.match(/^(https?:\/\/[^\/]+\/[^\/]+)\//); // origin + /r2 or /b2
         if (idm && seg) path = seg[1] + '/cachehd/' + decodeURIComponent(idm[1]) + '/index.m3u8';
     }
-    if (!path) { console.log('[anibd] no videoUrl in embed [' + label + ']'); return null; }
+    if (!path) { console.log('[anibd] no videoUrl in embed [' + serverTag + ']'); return null; }
 
     let streamUrl;
     try { streamUrl = new URL(path, emAbs).href; } catch (e) { streamUrl = path; }
@@ -252,24 +283,36 @@ async function resolveEmbed(embedUrl, label) {
     // origin-only Referer — matches the cross-origin segment fetch on ani*.nukitashith.top
     const origin = (function () { try { return new URL(emAbs).origin + '/'; } catch (e) { return AB.playOrigin + '/'; } })();
 
-    // subtitles: ArtPlayer `tracks:[{url|file, html|name|label|lang}]` — empty on the
-    // captured episode (hardsub), parsed defensively in case some titles carry VTT.
+    // subtitles: ArtPlayer tracks:[{ file|url, label|name|lang, kind, default }].
+    // Fields come in ANY order — real softsub embeds list "label" before "file" —
+    // so parse each track object on its own instead of a fixed file-then-label seq.
     const subtitles = [];
     const tm = raw.match(/tracks\s*:\s*(\[[\s\S]*?\])/);
-    if (tm && tm[1].indexOf('{') !== -1) {
-        const re = /["']?(?:url|file|src)["']?\s*:\s*["']([^"']+\.(?:vtt|srt|ass)[^"']*)["'][\s\S]*?["']?(?:html|name|label|lang)["']?\s*:\s*["']([^"']+)["']/gi;
-        let s;
-        while ((s = re.exec(tm[1])) !== null) {
-            let u; try { u = new URL(s[1], embedUrl).href; } catch (e) { u = s[1]; }
-            subtitles.push({ url: u, lang: s[2] });
-        }
+    if (tm) {
+        const objs = tm[1].match(/\{[^{}]*\}/g) || [];
+        objs.forEach(function (o) {
+            const fm = o.match(/["']?(?:file|url|src)["']?\s*:\s*["']([^"']+)["']/i);
+            if (!fm) return;
+            const lm = o.match(/["']?(?:label|name|lang|language|srclang)["']?\s*:\s*["']([^"']+)["']/i);
+            let u; try { u = new URL(fm[1], emAbs).href; } catch (e) { u = fm[1]; }
+            subtitles.push({ url: u, lang: lm ? lm[1] : 'English' });
+        });
     }
 
-    console.log('[anibd] resolved [' + label + '] ' + streamUrl + ' subs=' + subtitles.length);
+    // label: HSUB (burned-in: play2.php/cachehd, no tracks) vs SUB (softsub:
+    // playsub.php/cachesub, carries VTT) + quality pulled from the stream id.
+    const isSoft = /playsub\.php|cachesub|[?&]sub=/i.test(emAbs) || /cachesub/i.test(streamUrl) || subtitles.length > 0;
+    const type = isSoft ? 'SUB' : 'HSUB';
+    const qm = streamUrl.match(/(\d{3,4})p/);          // single-rendition playlists — no master/AUTO
+    const quality = qm ? (qm[1] + 'p') : '';
+    const title = type + (quality ? ' - ' + quality : '');
+
+    console.log('[anibd] resolved [' + title + ' / ' + serverTag + '] ' + streamUrl + ' subs=' + subtitles.length);
     return {
-        title: label,
+        title: title,
         streamUrl: streamUrl,
         headers: { 'Referer': origin },
         subtitles: subtitles,
+        server: serverTag,                              // kept only for de-duping mirror labels
     };
 }
