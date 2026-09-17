@@ -9,10 +9,9 @@
 //   apilink.php?data={ep.link} ──► [{ server, link }]   (link = play2.php iframe)
 //   play2.php embed ──► ArtPlayer config.videoUrl (relative HLS)  [CONFIRMED]
 //        embed body: const config = { videoUrl:"/r2/cachehd/{id}/index.m3u8", tracks:[] }
-//        → absolutize against embed origin; SB mirrors under /b2/. Hardsub (tracks empty).
+//        → absolutize against play host; SB mirrors under /b2/. Hardsub (tracks empty).
 //
-// OPEN CAPTURE:
-//   1) search3.php request params + JSON shape  (see searchResults)
+// Full chain verified end-to-end (search3 → api2 → apilink → play2 → m3u8).
 // ============================================================================
 
 const AB = {
@@ -20,6 +19,8 @@ const AB = {
     single:   'https://eng.animeapps.top/api/single.php?postid=',
     episodes: 'https://epeng.animeapps.top/api2.php?epid=',
     links:    'https://epeng.animeapps.top/apilink.php?data=',
+    // play2 host — apilink.php sometimes returns embed links host-relative
+    playOrigin: 'https://playeng.animeapps.top',
     // sub-only site: server id 10 = "S-sub" in the live page. null = "just take the first".
     subServerId: 10,
 };
@@ -57,36 +58,38 @@ function dec(s) {
 }
 
 // ============================================================================
-// 1) SEARCH   —— CAPTURE NEEDED ——
-// I don't have a confirmed search3.php response yet, so this reader is tolerant:
-// it accepts the field names anibd uses elsewhere and logs the raw body so the
-// first test run captures the real shape. Send me that log and I'll pin it.
+// 1) SEARCH   [CONFIRMED against search3.php]
+// GET search3.php?keyword=<kw>&page=1&limit=20
+//   → { status, pagination, data:[ { postid, postname, anilist,
+//         ani_cover_large(full AniList URL), anitypes, postyear, ... } ] }
+// anilist ships in every row, so episodes need no single.php lookup.
 // ============================================================================
 async function searchResults(keyword) {
-    const url = AB.search + '?s=' + encodeURIComponent(keyword) +
-                '&keyword=' + encodeURIComponent(keyword);
+    // app usually passes the raw term; tolerate a full searchBaseUrl too
+    let kw = String(keyword || '');
+    if (/^https?:\/\//i.test(kw)) {
+        const q = kw.match(/[?&](?:keyword|s|q)=([^&]+)/);
+        kw = q ? decodeURIComponent(q[1]) : kw;
+    }
+
+    const url = AB.search + '?keyword=' + encodeURIComponent(kw) + '&page=1&limit=20';
     const raw = await abFetch(url);
-    console.log('[anibd] search raw head :: ' + raw.slice(0, 600));
-
     const j = abJson(raw);
-    const rows = Array.isArray(j) ? j
-               : (j && Array.isArray(j.data))    ? j.data
-               : (j && Array.isArray(j.results)) ? j.results
-               : [];
+    const rows = (j && Array.isArray(j.data)) ? j.data : [];
 
-    const out = rows.map(function (it) {
-        const postid  = it.postid || it.id || it.post_id || '';
-        const anilist = it.anilist || it.anilist_id || '';
-        const title   = it.postname || it.title || it.name || '';
-        const img     = it.ani_cover_large || it.cover || it.image || it.thumbnail || '';
-        return {
-            title: title,
-            image: img ? ('https://rez1.ims1.top/350x/' + img) : '',
-            href:  enc({ postid: String(postid), anilist: String(anilist) }),
-        };
-    }).filter(function (x) { return x.title && x.href; });
+    const out = [];
+    rows.forEach(function (it) {
+        if (!it.postid) return;
+        let img = it.ani_cover_large || '';
+        if (img && !/^https?:\/\//i.test(img)) img = 'https://rez1.ims1.top/350x/' + img; // proxy only if relative
+        out.push({
+            title: it.postname || ('#' + it.postid),
+            image: img,
+            href:  enc({ postid: String(it.postid), anilist: String(it.anilist || '') }),
+        });
+    });
 
-    console.log('[anibd] search results=' + out.length + ' for "' + keyword + '"');
+    console.log('[anibd] search results=' + out.length + ' for "' + kw + '"');
     return JSON.stringify(out);
 }
 
@@ -220,7 +223,16 @@ async function extractStreamUrl(url) {
 // Referer — so that's the header the app must replay for the whole stream.
 // ============================================================================
 async function resolveEmbed(embedUrl, label) {
-    const raw = await abFetch(embedUrl, { 'Referer': 'https://anibd.app/' });
+    // apilink.php is inconsistent: SB comes back absolute, SR often host-relative
+    // ("/r2/play2.php?..."). Pin any relative link to the play host first, so BOTH
+    // the page fetch and the relative videoUrl absolutize to a real URL the player
+    // accepts (the log showed SR playing back as a bare "/r2/cachehd/...").
+    let emAbs = String(embedUrl || '');
+    if (/^\/\//.test(emAbs)) emAbs = 'https:' + emAbs;
+    else if (/^\//.test(emAbs)) emAbs = AB.playOrigin + emAbs;
+    else if (!/^https?:\/\//i.test(emAbs)) emAbs = AB.playOrigin + '/' + emAbs;
+
+    const raw = await abFetch(emAbs, { 'Referer': 'https://anibd.app/' });
 
     // primary: pull the relative HLS path straight out of the ArtPlayer config
     let m = raw.match(/videoUrl\s*:\s*["']([^"']+)["']/i);
@@ -228,17 +240,17 @@ async function resolveEmbed(embedUrl, label) {
 
     // fallback: rebuild from the ?url= id if the site ever reshapes the config
     if (!path) {
-        const idm = embedUrl.match(/[?&]url=([^&]+)/);
-        const seg = embedUrl.match(/^(https?:\/\/[^\/]+\/[^\/]+)\//); // origin + /r2 or /b2
+        const idm = emAbs.match(/[?&]url=([^&]+)/);
+        const seg = emAbs.match(/^(https?:\/\/[^\/]+\/[^\/]+)\//); // origin + /r2 or /b2
         if (idm && seg) path = seg[1] + '/cachehd/' + decodeURIComponent(idm[1]) + '/index.m3u8';
     }
     if (!path) { console.log('[anibd] no videoUrl in embed [' + label + ']'); return null; }
 
     let streamUrl;
-    try { streamUrl = new URL(path, embedUrl).href; } catch (e) { streamUrl = path; }
+    try { streamUrl = new URL(path, emAbs).href; } catch (e) { streamUrl = path; }
 
     // origin-only Referer — matches the cross-origin segment fetch on ani*.nukitashith.top
-    const origin = (function () { try { return new URL(embedUrl).origin + '/'; } catch (e) { return 'https://playeng.animeapps.top/'; } })();
+    const origin = (function () { try { return new URL(emAbs).origin + '/'; } catch (e) { return AB.playOrigin + '/'; } })();
 
     // subtitles: ArtPlayer `tracks:[{url|file, html|name|label|lang}]` — empty on the
     // captured episode (hardsub), parsed defensively in case some titles carry VTT.
