@@ -51,6 +51,22 @@ async function abFetch(url, headers) {
     }
 }
 function abJson(txt) { try { return JSON.parse(txt); } catch (e) { return null; } }
+
+// Absolutize a URL WITHOUT the URL constructor — JavaScriptCore (Sora/Luna) either
+// lacks it or throws, which silently left relative stream paths ("/r2/cachehd/…")
+// unresolved and unplayable. Pure string ops only.
+function absUrl(path, base) {
+    path = String(path || '');
+    if (/^https?:\/\//i.test(path)) return path;            // already absolute
+    if (/^\/\//.test(path)) return 'https:' + path;         // protocol-relative
+    const om = String(base || '').match(/^(https?:\/\/[^\/]+)/i);
+    const origin = om ? om[1] : AB.playOrigin;
+    if (path.charAt(0) === '/') return origin + path;       // root-relative
+    const dir = String(base || '').replace(/[?#].*$/, '').replace(/\/[^\/]*$/, '/'); // strip filename+query
+    return (/^https?:\/\//i.test(dir) ? dir : origin + '/') + path;
+}
+function originOf(u) { const m = String(u || '').match(/^(https?:\/\/[^\/]+)/i); return (m ? m[1] : AB.playOrigin) + '/'; }
+
 function enc(o) { return encodeURIComponent(JSON.stringify(o)); }
 function dec(s) {
     // href may arrive raw-JSON or url-encoded depending on the app
@@ -277,11 +293,10 @@ async function resolveEmbed(embedUrl, serverTag) {
     }
     if (!path) { console.log('[anibd] no videoUrl in embed [' + serverTag + ']'); return null; }
 
-    let streamUrl;
-    try { streamUrl = new URL(path, emAbs).href; } catch (e) { streamUrl = path; }
+    const streamUrl = absUrl(path, emAbs);
 
-    // origin-only Referer — matches the cross-origin segment fetch on ani*.nukitashith.top
-    const origin = (function () { try { return new URL(emAbs).origin + '/'; } catch (e) { return AB.playOrigin + '/'; } })();
+    // origin-only Referer — matches the cross-origin segment fetch on ani*.nukitashi(th).top
+    const origin = originOf(emAbs);
 
     // subtitles: ArtPlayer tracks:[{ file|url, label|name|lang, kind, default }].
     // Fields come in ANY order — real softsub embeds list "label" before "file" —
@@ -294,7 +309,7 @@ async function resolveEmbed(embedUrl, serverTag) {
             const fm = o.match(/["']?(?:file|url|src)["']?\s*:\s*["']([^"']+)["']/i);
             if (!fm) return;
             const lm = o.match(/["']?(?:label|name|lang|language|srclang)["']?\s*:\s*["']([^"']+)["']/i);
-            let u; try { u = new URL(fm[1], emAbs).href; } catch (e) { u = fm[1]; }
+            let u = absUrl(fm[1], emAbs);
             subtitles.push({ url: u, lang: lm ? lm[1] : 'English' });
         });
     }
