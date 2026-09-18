@@ -100,14 +100,20 @@ function titleScore(t) {
     return words.length * 100 + t.replace(/[^a-z]/gi, "").length;
 }
 
-/* pick the best real title across a chapter's group uploads, ignoring any
- * candidate that is really just a scanlation-group name (some uploaders drop
- * the bare group name, e.g. "DigitalMangaFan", into the title field) */
-function bestChapterTitle(entries, num, groupNames) {
+/* A title that shows up on many different chapters is a per-group watermark
+ * (e.g. "DigitalMangaFan" on 645 Bleach chapters, "1r0n" on One Piece), not a
+ * real chapter name. Real titles are near-unique. */
+const MAX_TITLE_REPEAT = 8;
+
+/* pick the best real title across a chapter's group uploads, skipping any
+ * candidate that is a scanlation-group name or a repeated watermark */
+function bestChapterTitle(entries, num, groupNames, titleCount) {
     let best = "", bestScore = 0;
     for (let i = 0; i < entries.length; i++) {
         const c = cleanChapterTitle(entries[i]._rawTitle);
-        if (groupNames && groupNames[c.toLowerCase()]) continue; // group name, not a title
+        const lc = c.toLowerCase();
+        if (groupNames && groupNames[lc]) continue;                 // group name
+        if (titleCount && titleCount[lc] > MAX_TITLE_REPEAT) continue; // watermark
         const s = titleScore(c);
         if (s > bestScore) { bestScore = s; best = c; }
     }
@@ -173,14 +179,23 @@ async function extractChapters(url) {
         const list = JSON.parse(await response.text());
         if (!Array.isArray(list)) return { en: [] };
 
-        // collect every group/scanlator name so we can keep them out of titles
+        // collect group/scanlator names and per-title chapter spread, so we can
+        // keep group names and repeated watermarks out of the displayed titles
         const groupNames = {};
+        const titleNums = {};
         for (let i = 0; i < list.length; i++) {
             const c = list[i];
             if (!c) continue;
             if (c.group_name) groupNames[String(c.group_name).toLowerCase().trim()] = 1;
             if (c.scanlator_name) groupNames[String(c.scanlator_name).toLowerCase().trim()] = 1;
+            const ct = cleanChapterTitle(c.chapter_title).toLowerCase();
+            if (ct) {
+                if (!titleNums[ct]) titleNums[ct] = {};
+                titleNums[ct][parseFloat(c.chapter_number)] = 1;
+            }
         }
+        const titleCount = {};
+        for (const t in titleNums) titleCount[t] = Object.keys(titleNums[t]).length;
 
         // group every scanlator upload under its chapter number
         const groups = {};      // number -> entries[]
@@ -206,7 +221,7 @@ async function extractChapters(url) {
             const num = order[i];
             const entries = groups[num];
             // one canonical title per chapter, taken from the best-named upload
-            const title = bestChapterTitle(entries, num, groupNames);
+            const title = bestChapterTitle(entries, num, groupNames, titleCount);
             entries.sort(function (a, b) { return a._date > b._date ? -1 : (a._date < b._date ? 1 : 0); });
             for (let j = 0; j < entries.length; j++) {
                 entries[j].title = title;
