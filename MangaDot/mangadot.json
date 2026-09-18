@@ -1,7 +1,7 @@
 {
   "sourceName": "Mangadotnet",
   "iconURL": "https://www.google.com/s2/favicons?sz=128&domain=mangadot.net",
-  "version": "1.0.2",
+  "version": "1.0.1",
   "language": "English",
   "scriptURL": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/MangaDot/mangadot.js",
   "author": {
