@@ -100,6 +100,23 @@ function titleScore(t) {
     return words.length * 100 + t.replace(/[^a-z]/gi, "").length;
 }
 
+/* Scan-quality ranking of scanlation groups (best first). Official digital
+ * sources read cleanest and highest-res; the "Official" rehost is demoted
+ * because it carries watermarks and truncated 2-page chapters. */
+const GROUP_PRIORITY = [
+    "manga plus", "mangaplus", "viz media", "crunchyroll",
+    "tcb scans", "colored council", "colored", "manga million"
+];
+function groupRank(name) {
+    const g = String(name || "").toLowerCase().trim();
+    for (let i = 0; i < GROUP_PRIORITY.length; i++) {
+        if (g === GROUP_PRIORITY[i] || g.indexOf(GROUP_PRIORITY[i]) !== -1) return i;
+    }
+    if (g.indexOf("official") !== -1) return 90;        // watermarked rehost, last resort
+    if (!g || g === "no-group") return 95;              // uncredited
+    return 80;                                          // unknown small groups
+}
+
 /* A title that shows up on many different chapters is a per-group watermark
  * (e.g. "DigitalMangaFan" on 645 Bleach chapters, "1r0n" on One Piece), not a
  * real chapter name. Real titles are near-unique. */
@@ -211,6 +228,7 @@ async function extractChapters(url) {
                 chapter: num,
                 scanlation_group: String(c.group_name || c.scanlator_name || ""),
                 _rawTitle: c.chapter_title,
+                _pages: Number(c.page_count) || 0,
                 _date: String(c.date_added || "")
             });
         }
@@ -222,10 +240,17 @@ async function extractChapters(url) {
             const entries = groups[num];
             // one canonical title per chapter, taken from the best-named upload
             const title = bestChapterTitle(entries, num, groupNames, titleCount);
-            entries.sort(function (a, b) { return a._date > b._date ? -1 : (a._date < b._date ? 1 : 0); });
+            // order uploads best-quality-first: group rank, then most pages, then newest
+            entries.sort(function (a, b) {
+                const ra = groupRank(a.scanlation_group), rb = groupRank(b.scanlation_group);
+                if (ra !== rb) return ra - rb;
+                if (b._pages !== a._pages) return b._pages - a._pages;
+                return a._date > b._date ? -1 : (a._date < b._date ? 1 : 0);
+            });
             for (let j = 0; j < entries.length; j++) {
                 entries[j].title = title;
                 delete entries[j]._date;
+                delete entries[j]._pages;
                 delete entries[j]._rawTitle;
             }
             results.push([String(num), entries]);
