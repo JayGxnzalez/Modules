@@ -11,6 +11,15 @@ async function soraFetch(url, options = { headers: {}, method: 'GET', body: null
     }
 }
 
+/* Shirox/the site's HTTP cache can hand back a stale body under a 304 (a
+ * different manga's data served for the requested id). A unique per-request
+ * param makes every data URL novel so the cache can never serve a stale hit. */
+let __cbSeq = 0;
+function noCache(url) {
+    const sep = url.indexOf("?") !== -1 ? "&" : "?";
+    return url + sep + "_ts=" + Date.now().toString(36) + (++__cbSeq).toString(36);
+}
+
 function toAbsolute(u) {
     u = String(u || "").trim();
     if (!u) return "";
@@ -100,6 +109,11 @@ function titleScore(t) {
     return words.length * 100 + t.replace(/[^a-z]/gi, "").length;
 }
 
+/* When true, a chapter that has a colored upload defaults to it, falling back
+ * to the highest-quality B&W group below when no colored version exists.
+ * Flip to false to make the B&W quality order the default instead. */
+const PREFER_COLORED = true;
+
 /* Scan-quality ranking of scanlation groups (best first). Official digital
  * sources read cleanest and highest-res; the "Official" rehost is demoted
  * because it carries watermarks and truncated 2-page chapters. */
@@ -107,8 +121,12 @@ const GROUP_PRIORITY = [
     "manga plus", "mangaplus", "viz media", "crunchyroll",
     "tcb scans", "colored council", "colored", "manga million"
 ];
+function isColored(name) {
+    return String(name || "").toLowerCase().indexOf("color") !== -1;
+}
 function groupRank(name) {
     const g = String(name || "").toLowerCase().trim();
+    if (PREFER_COLORED && isColored(g)) return -1;      // colored scans first
     for (let i = 0; i < GROUP_PRIORITY.length; i++) {
         if (g === GROUP_PRIORITY[i] || g.indexOf(GROUP_PRIORITY[i]) !== -1) return i;
     }
@@ -141,7 +159,7 @@ async function searchResults(keyword, page = 1) {
     const results = [];
     try {
         const url = "https://mangadot.net/search.data?search=" + encodeURIComponent(keyword);
-        const response = await soraFetch(url);
+        const response = await soraFetch(noCache(url));
         if (!response) return results;
 
         const root = decodeTurbo(JSON.parse(await response.text()));
@@ -169,7 +187,7 @@ async function extractDetails(url) {
         const id = extractMangaId(url);
         if (!id) return { description: "Error", tags: [] };
 
-        const response = await soraFetch("https://mangadot.net/manga/" + id + ".data");
+        const response = await soraFetch(noCache("https://mangadot.net/manga/" + id + ".data"));
         if (!response) return { description: "Error", tags: [] };
 
         const root = decodeTurbo(JSON.parse(await response.text()));
@@ -190,7 +208,7 @@ async function extractChapters(url) {
         const id = extractMangaId(url);
         if (!id) return { en: [] };
 
-        const response = await soraFetch("https://mangadot.net/api/manga/" + id + "/chapters/list?lang=en");
+        const response = await soraFetch(noCache("https://mangadot.net/api/manga/" + id + "/chapters/list?lang=en"));
         if (!response) return { en: [] };
 
         const list = JSON.parse(await response.text());
@@ -268,7 +286,7 @@ async function extractImages(url) {
         const chId = extractChapterId(url);
         if (!chId) return results;
 
-        const response = await soraFetch("https://mangadot.net/api/uploads/" + chId + "/images");
+        const response = await soraFetch(noCache("https://mangadot.net/api/uploads/" + chId + "/images"));
         if (!response) return results;
 
         const json = JSON.parse(await response.text());
