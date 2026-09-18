@@ -69,6 +69,48 @@ function routeData(root, routeId) {
     return node && node.data ? node.data : null;
 }
 
+/* Chapter titles on mangadot are per-upload and inconsistent: most groups
+ * store a generic "Chapter N", while others carry the real name — often
+ * buried under "Chapter N - Volume M (Group) {f}" scaffolding. Strip the
+ * scaffolding, then keep whatever real title remains. */
+function cleanChapterTitle(t) {
+    if (!t) return "";
+    t = String(t).trim();
+    // drop up to two trailing (group)/{flag}/[tag] blocks
+    t = t.replace(/\s*[\(\{\[][^)\}\]]*[\)\}\]]\s*$/, "").trim();
+    t = t.replace(/\s*[\(\{\[][^)\}\]]*[\)\}\]]\s*$/, "").trim();
+    // drop leading "Chapter N", optional "- Volume M", and any separator
+    t = t.replace(/^chapter\s*[0-9]+(?:\.[0-9]+)?\s*(?:-\s*volume\s*[0-9]+)?\s*[-:]?\s*/i, "").trim();
+    return t;
+}
+
+/* Is a cleaned title an actual name (vs. a number / junk watermark)? */
+function isRealTitle(t) {
+    if (!t) return false;
+    if (/^(?:chapter|ch\.?|episode|ep\.?|vol(?:ume)?)?\s*[0-9]+(?:\.[0-9]+)?$/i.test(t)) return false;
+    if (!/[a-z]/i.test(t)) return false;              // needs letters
+    if (!/\s/.test(t) && /[0-9]/.test(t)) return false; // single digit-laced token, e.g. "1r0n"
+    return true;
+}
+
+/* higher = more descriptive; generic/junk scores 0 */
+function titleScore(t) {
+    if (!isRealTitle(t)) return 0;
+    const words = t.split(/\s+/).filter(function (w) { return /[a-z]/i.test(w); });
+    return words.length * 100 + t.replace(/[^a-z]/gi, "").length;
+}
+
+/* pick the best real title across a chapter's group uploads */
+function bestChapterTitle(entries, num) {
+    let best = "", bestScore = 0;
+    for (let i = 0; i < entries.length; i++) {
+        const c = cleanChapterTitle(entries[i]._rawTitle);
+        const s = titleScore(c);
+        if (s > bestScore) { bestScore = s; best = c; }
+    }
+    return bestScore > 0 ? best : ("Chapter " + num);
+}
+
 async function searchResults(keyword, page = 1) {
     const results = [];
     try {
@@ -139,9 +181,9 @@ async function extractChapters(url) {
             if (!groups[num]) { groups[num] = []; order.push(num); }
             groups[num].push({
                 id: "https://mangadot.net/chapter/" + c.id,
-                title: String(c.chapter_title || ("Chapter " + num)),
                 chapter: num,
                 scanlation_group: String(c.group_name || c.scanlator_name || ""),
+                _rawTitle: c.chapter_title,
                 _date: String(c.date_added || "")
             });
         }
@@ -151,8 +193,14 @@ async function extractChapters(url) {
         for (let i = 0; i < order.length; i++) {
             const num = order[i];
             const entries = groups[num];
+            // one canonical title per chapter, taken from the best-named upload
+            const title = bestChapterTitle(entries, num);
             entries.sort(function (a, b) { return a._date > b._date ? -1 : (a._date < b._date ? 1 : 0); });
-            for (let j = 0; j < entries.length; j++) delete entries[j]._date;
+            for (let j = 0; j < entries.length; j++) {
+                entries[j].title = title;
+                delete entries[j]._date;
+                delete entries[j]._rawTitle;
+            }
             results.push([String(num), entries]);
         }
 
