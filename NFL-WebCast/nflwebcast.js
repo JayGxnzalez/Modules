@@ -32,7 +32,7 @@ async function getJson(res) {
 }
 
 var UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15";
-var ICON = "https://raw.githubusercontent.com/JayGxnzalez/NFL-Webcast/refs/heads/main/Icon.png";
+var ICON = "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/NFL-WebCast/Icon.png";
 var ESPN_API = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 
 // Map ESPN team abbreviations to nflwebcast.com slugs
