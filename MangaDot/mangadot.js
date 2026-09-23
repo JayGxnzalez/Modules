@@ -208,7 +208,9 @@ async function extractChapters(url) {
         const id = extractMangaId(url);
         if (!id) return { en: [] };
 
-        const response = await soraFetch(noCache("https://mangadot.net/api/manga/" + id + "/chapters/list?lang=en"));
+        // NOTE: no cache-buster here — mangadot's Cloudflare WAF 403-challenges
+        // /api/ requests that carry unexpected query params (e.g. _ts).
+        const response = await soraFetch("https://mangadot.net/api/manga/" + id + "/chapters/list?lang=en");
         if (!response) return { en: [] };
 
         const list = JSON.parse(await response.text());
@@ -286,7 +288,8 @@ async function extractImages(url) {
         const chId = extractChapterId(url);
         if (!chId) return results;
 
-        const response = await soraFetch(noCache("https://mangadot.net/api/uploads/" + chId + "/images"));
+        // no cache-buster on /api/ — see extractChapters (Cloudflare WAF)
+        const response = await soraFetch("https://mangadot.net/api/uploads/" + chId + "/images");
         if (!response) return results;
 
         const json = JSON.parse(await response.text());
