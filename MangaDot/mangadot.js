@@ -20,6 +20,18 @@ function noCache(url) {
     return url + sep + "_ts=" + Date.now().toString(36) + (++__cbSeq).toString(36);
 }
 
+/* mangadot put a Cloudflare managed challenge on its /api/ routes. In a browser
+ * those calls carry same-origin Referer/Origin + an XHR marker; the app's bare
+ * fetch does not, which is what the WAF rule flags. Send them so the request
+ * looks like the site's own react-query call. (No User-Agent — that must stay
+ * whatever earned the cf_clearance token, or CF re-challenges.) */
+const API_HEADERS = {
+    "Referer": "https://mangadot.net/",
+    "Origin": "https://mangadot.net",
+    "Accept": "application/json, text/plain, */*",
+    "X-Requested-With": "XMLHttpRequest"
+};
+
 function toAbsolute(u) {
     u = String(u || "").trim();
     if (!u) return "";
@@ -208,9 +220,9 @@ async function extractChapters(url) {
         const id = extractMangaId(url);
         if (!id) return { en: [] };
 
-        // NOTE: no cache-buster here — mangadot's Cloudflare WAF 403-challenges
-        // /api/ requests that carry unexpected query params (e.g. _ts).
-        const response = await soraFetch("https://mangadot.net/api/manga/" + id + "/chapters/list?lang=en");
+        // /api/ is behind a Cloudflare managed challenge — send browser-like
+        // headers so the request matches the site's own call. No _ts here.
+        const response = await soraFetch("https://mangadot.net/api/manga/" + id + "/chapters/list?lang=en", { headers: API_HEADERS });
         if (!response) return { en: [] };
 
         const list = JSON.parse(await response.text());
@@ -288,8 +300,8 @@ async function extractImages(url) {
         const chId = extractChapterId(url);
         if (!chId) return results;
 
-        // no cache-buster on /api/ — see extractChapters (Cloudflare WAF)
-        const response = await soraFetch("https://mangadot.net/api/uploads/" + chId + "/images");
+        // /api/ behind Cloudflare — send browser-like headers (see extractChapters)
+        const response = await soraFetch("https://mangadot.net/api/uploads/" + chId + "/images", { headers: API_HEADERS });
         if (!response) return results;
 
         const json = JSON.parse(await response.text());
