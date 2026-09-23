@@ -1,0 +1,20 @@
+{
+  "sourceName": "PenguPlay",
+  "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/PenguPlay/Icon.png",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.0.0",
+  "language": "Multi",
+  "streamType": "HLS",
+  "quality": "2160",
+  "baseUrl": "https://pengu.uk/",
+  "searchBaseUrl": "https://pengu.uk/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/PenguPlay/PenguPlay.js",
+  "type": "Movie/TV",
+  "downloadSupport": true,
+  "asyncJS": true,
+  "softsub": true
+}
