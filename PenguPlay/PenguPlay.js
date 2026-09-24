@@ -31,6 +31,19 @@ const CONFIG_SEG = AUTH_TOKEN
 const PP_BASE = "https://pengu.uk";
 const CINEMETA = "https://v3-cinemeta.strem.io";
 
+// TVmaze (keyless) for series search. Cinemeta stores short canonical titles —
+// it returns tt13207736 as plain "Monster", which is unrecognisable next to the
+// Monster anime — while TVmaze returns "DAHMER - Monster: The Jeffrey Dahmer
+// Story" and ranks it first. Its `externals.imdb` yields the same tt id
+// PenguPlay wants, so episodes still resolve through Cinemeta afterwards.
+// TVmaze is TV-only, so movies stay on Cinemeta.
+const TVMAZE = "https://api.tvmaze.com";
+// Relative score cutoff: TVmaze fuzzy-matches ("dahmer" also returns "Danger
+// Mouse", "Danger 5"). Real hits sat at >=0.386 and noise at <=0.324, so
+// keeping everything within this fraction of the top score cuts cleanly
+// without hardcoding a threshold that won't travel to other queries.
+const TVMAZE_SCORE_RATIO = 0.70;
+
 // Subtitles. PenguPlay's own /subtitles endpoint returns an empty array for
 // every title tested (movies and series, tokenless), and several VAPlayer
 // streams are flagged "No included subtitles" — so OpenSubtitles is the only
@@ -225,6 +238,31 @@ function parseHref(href) {
   return { type: type, ppId: ppId };
 }
 
+// Series search via TVmaze, reduced to {id (tt), name, year} entries.
+async function searchTvmaze(keyword) {
+  try {
+    const rows = await getJSON(TVMAZE + "/search/shows?q=" + encodeURIComponent(keyword));
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    const cutoff = (rows[0].score || 0) * TVMAZE_SCORE_RATIO;
+    const out = [];
+    rows.forEach(function (row) {
+      if (!row || !row.show || (row.score || 0) < cutoff) return;
+      const ext = row.show.externals || {};
+      // No IMDb id means no id PenguPlay accepts, so the entry is unplayable.
+      if (!ext.imdb) return;
+      out.push({
+        id: ext.imdb,
+        name: row.show.name,
+        releaseInfo: String(row.show.premiered || "").slice(0, 4)
+      });
+    });
+    return out;
+  } catch (e) {
+    console.log("[penguplay] tvmaze error: " + e);
+    return [];
+  }
+}
+
 // ---- 1. SEARCH ------------------------------------------------------------
 async function searchResults(keyword) {
   const q = encodeURIComponent(keyword);
@@ -234,21 +272,47 @@ async function searchResults(keyword) {
   ];
   const out = [];
   try {
-    const [mv, sr] = await Promise.all(urls.map(function (u) {
-      return getJSON(u).catch(function () { return { metas: [] }; });
-    }));
-    const push = function (metas, type) {
-      (metas || []).forEach(function (it) {
-        if (!it || !it.id) return;
-        out.push({
-          title: it.name + (it.releaseInfo ? " (" + it.releaseInfo + ")" : ""),
-          image: it.poster || "",
-          href: CINEMETA + "/meta/" + type + "/" + it.id + ".json"
-        });
-      });
+    const [mv, sr, tv] = await Promise.all([
+      getJSON(urls[0]).catch(function () { return { metas: [] }; }),
+      getJSON(urls[1]).catch(function () { return { metas: [] }; }),
+      searchTvmaze(keyword)
+    ]);
+    // Cinemeta relevance-ranks each list independently, so concatenating them
+    // buries a highly-ranked series behind every movie (searching "Dahmer" put
+    // Netflix's "Monster" — the #1 series hit — at position 10, after nine
+    // obscure documentaries). Interleave instead, so the best movie and the
+    // best series sit side by side at the top.
+    const toEntry = function (it, type) {
+      return {
+        title: it.name + (it.releaseInfo ? " (" + it.releaseInfo + ")" : ""),
+        image: it.poster || "",
+        href: CINEMETA + "/meta/" + type + "/" + it.id + ".json"
+      };
     };
-    push(mv.metas, "movie");
-    push(sr.metas, "series");
+    const mvList = (mv.metas || []).filter(function (it) { return it && it.id; });
+
+    // Series list: TVmaze first (better titles, better ranking), then any
+    // Cinemeta series it didn't already cover, deduped by tt id.
+    const srList = [];
+    const seenSeries = {};
+    (tv || []).forEach(function (it) {
+      if (seenSeries[it.id]) return;
+      seenSeries[it.id] = true;
+      srList.push(it);
+    });
+    (sr.metas || []).forEach(function (it) {
+      if (!it || !it.id || seenSeries[it.id]) return;
+      seenSeries[it.id] = true;
+      srList.push(it);
+    });
+    console.log("[penguplay] search sources: cinemeta-movies=" + mvList.length +
+                " tvmaze-series=" + (tv || []).length +
+                " cinemeta-series=" + ((sr.metas || []).length) +
+                " merged-series=" + srList.length);
+    for (let i = 0; i < Math.max(mvList.length, srList.length); i++) {
+      if (i < mvList.length) out.push(toEntry(mvList[i], "movie"));
+      if (i < srList.length) out.push(toEntry(srList[i], "series"));
+    }
     console.log("[penguplay] search '" + keyword + "' -> " + out.length + " results");
   } catch (e) {
     console.log("[penguplay] search error: " + e);
