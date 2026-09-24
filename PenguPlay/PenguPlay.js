@@ -14,9 +14,16 @@
 // All four outputs are JSON.stringify'd (Shirox video-module requirement).
 
 // ---- USER CONFIG ----------------------------------------------------------
-// Filtering is done on-device; PenguPlay is queried anonymously.
-const MIN_RES = 0;          // e.g. 480 to hide anything below 480p
-const BLOCK_SOURCES = [];   // e.g. ["MovieBox"] to hide a provider
+const AUTH_TOKEN = "SCLz87P2nS1zZo1bUrt_thOZFcq6ERJr5L00glctYmQ";  // required, no streams without it
+const SERVER_FILTERS = {};  // PenguPlay-side filters, e.g. { res_360: "unchecked" }
+const MIN_RES = 0;          // on-device: e.g. 480 to hide anything below 480p
+const BLOCK_SOURCES = [];   // on-device: e.g. ["MovieBox"] to hide a provider
+
+// PenguPlay takes its config as a URL-encoded JSON path segment.
+const CONFIG_SEG = AUTH_TOKEN
+  ? "/" + encodeURIComponent(JSON.stringify(
+      Object.assign({ auth_token: AUTH_TOKEN }, SERVER_FILTERS)))
+  : "";
 
 const PP_BASE = "https://pengu.uk";
 const CINEMETA = "https://v3-cinemeta.strem.io";
@@ -92,7 +99,19 @@ const SUB_LANG_NAMES = {
   ron: "Romanian", heb: "Hebrew", est: "Estonian", lav: "Latvian",
   lit: "Lithuanian", mal: "Malayalam", tam: "Tamil", tel: "Telugu",
   ben: "Bengali", fil: "Filipino", cat: "Catalan", glg: "Galician",
-  eus: "Basque", cym: "Welsh", alb: "Albanian", ice: "Icelandic"
+  eus: "Basque", cym: "Welsh", alb: "Albanian", ice: "Icelandic",
+  // ISO 639-2/B variants and OpenSubtitles' own codes. These showed up as raw
+  // uppercase labels (MAY, PER, TGL, KUR, MAC, SLO, SPL) in real device logs
+  // because only the /T spellings were mapped above.
+  may: "Malay", per: "Persian", fas: "Persian", tgl: "Tagalog",
+  kur: "Kurdish", mac: "Macedonian", mkd: "Macedonian",
+  slo: "Slovak", sqi: "Albanian", isl: "Icelandic", zsm: "Malay",
+  spl: "Spanish (LatAm)", ces_cz: "Czech", chi: "Chinese (Simplified)",
+  arm: "Armenian", geo: "Georgian", bur: "Burmese", khm: "Khmer",
+  sin: "Sinhala", nep: "Nepali", urd: "Urdu", pan: "Punjabi",
+  guj: "Gujarati", kan: "Kannada", mar: "Marathi", mya: "Burmese",
+  aze: "Azerbaijani", kaz: "Kazakh", uzb: "Uzbek", bel: "Belarusian",
+  lat: "Latin", epo: "Esperanto", afr: "Afrikaans", swa: "Swahili"
 };
 
 function subLabel(t) {
@@ -253,8 +272,8 @@ async function extractEpisodes(url) {
 // ---- 4. STREAMS -----------------------------------------------------------
 async function extractStreamUrl(url) {
   const { type, ppId } = parseHref(url);
-  const streamURL = PP_BASE + "/stream/" + type + "/" + ppId + ".json";
-  const subsURL = PP_BASE + "/subtitles/" + type + "/" + ppId + ".json";
+  const streamURL = PP_BASE + CONFIG_SEG + "/stream/" + type + "/" + ppId + ".json";
+  const subsURL = PP_BASE + CONFIG_SEG + "/subtitles/" + type + "/" + ppId + ".json";
 
   const streams = [];
   const subtitles = [];
@@ -273,10 +292,10 @@ async function extractStreamUrl(url) {
 
     (sData.streams || []).forEach(function (s) {
       if (!s || !s.url) return; // skips the donate entry (externalUrl only)
-      // PenguPlay serves MOVIES anonymously but gates SERIES behind an account:
-      // a tokenless /stream/series/... returns a single "You must sign in" entry
-      // pointing at signin.mp4. Without this guard that stub would appear in the
-      // picker as a playable stream. Verified on tt0903747 and tt1475582.
+      // Auth stub: PenguPlay answers an unauthenticated (or over-quota, or
+      // revoked) request with ONE entry pointing at signin.mp4 instead of
+      // streams — for movies as well as series. Without this guard it would sit
+      // in the picker looking like a playable stream.
       if (s.url.indexOf("/signin.mp4") > -1) {
         authBlocked = true;
         return;
@@ -326,8 +345,10 @@ async function extractStreamUrl(url) {
     });
 
     if (authBlocked) {
-      console.log("[penguplay] AUTH REQUIRED for " + type + "/" + ppId +
-                  " — PenguPlay gates series behind an account; movies are open.");
+      console.log("[penguplay] AUTH REQUIRED for " + type + "/" + ppId + " — " +
+                  (AUTH_TOKEN
+                    ? "token present but rejected (invalid, revoked or out of quota)."
+                    : "no AUTH_TOKEN set; PenguPlay returns no streams without one."));
     }
     console.log("[penguplay] streams=" + streams.length +
                 " rawsubs=" + subtitles.length +
