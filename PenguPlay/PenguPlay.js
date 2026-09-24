@@ -386,7 +386,18 @@ async function extractEpisodes(url) {
       // (season, then episode) is what makes those resets land in order.
       vids.forEach(function (v) {
         const ppId = parsed.ppId + ":" + v.season + ":" + v.episode;
-        eps.push({ href: url + "#" + ppId, number: v.episode });
+        const ep = { href: url + "#" + ppId, number: v.episode };
+        // Cinemeta carries per-episode name/overview/thumbnail. Which key the
+        // episode list reads isn't known (HydraHD emits href+number only), so
+        // emit the plausible spellings of each and let the app take what it
+        // recognises — the same approach that made `allSubtitles` work.
+        // Empty values are left off so a blank never overwrites "Episode N".
+        const name = v.name || v.title || "";
+        if (name) { ep.title = name; ep.name = name; }
+        const desc = v.overview || v.description || "";
+        if (desc) { ep.description = desc; ep.overview = desc; }
+        if (v.thumbnail) { ep.thumbnail = v.thumbnail; ep.image = v.thumbnail; }
+        eps.push(ep);
       });
     }
     console.log("[penguplay] episodes -> " + eps.length);
