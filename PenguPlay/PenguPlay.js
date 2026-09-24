@@ -43,6 +43,8 @@ const TVMAZE = "https://api.tvmaze.com";
 // keeping everything within this fraction of the top score cuts cleanly
 // without hardcoding a threshold that won't travel to other queries.
 const TVMAZE_SCORE_RATIO = 0.70;
+// Stremio's poster CDN, keyed by IMDb id — used only if TVmaze has no artwork.
+const METAHUB_POSTER = "https://images.metahub.space/poster/original/";
 
 // Subtitles. PenguPlay's own /subtitles endpoint returns an empty array for
 // every title tested (movies and series, tokenless), and several VAPlayer
@@ -250,9 +252,16 @@ async function searchTvmaze(keyword) {
       const ext = row.show.externals || {};
       // No IMDb id means no id PenguPlay accepts, so the entry is unplayable.
       if (!ext.imdb) return;
+      // TVmaze carries its own artwork; without this the card renders as an
+      // empty placeholder next to Cinemeta rows that do have posters.
+      // Fall back to Stremio's poster CDN, which is keyed by the same tt id.
+      const img = row.show.image || {};
+      const poster = img.original || img.medium ||
+                     (METAHUB_POSTER + ext.imdb + "/img");
       out.push({
         id: ext.imdb,
         name: row.show.name,
+        poster: poster,
         releaseInfo: String(row.show.premiered || "").slice(0, 4)
       });
     });
