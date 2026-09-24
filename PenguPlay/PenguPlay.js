@@ -228,6 +228,25 @@ function containerInfo(s) {
   return { ext: "", play: PLAY_MAYBE };
 }
 
+// Cinemeta returns `released` as a full ISO timestamp
+// ("2022-09-21T00:00:00.000Z"), which the detail page renders verbatim.
+// Reformat with plain string ops — no Date object, since JavaScriptCore's
+// date parsing and toLocaleDateString are unreliable on-device.
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+
+function formatAirdate(v) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  // Anything that isn't a plain ISO date — a year, or a "2022-2024" range —
+  // is already display-ready and passes through untouched.
+  if (!m) return s;
+  const name = MONTH_NAMES[parseInt(m[2], 10) - 1];
+  if (!name) return m[1] + "-" + m[2] + "-" + m[3];
+  return name + " " + parseInt(m[3], 10) + ", " + m[1];
+}
+
 // Pull "type" (movie|series) and the pp id out of the internal href.
 // detail href : https://v3-cinemeta.strem.io/meta/<type>/<id>.json
 // episode href: ...same... #<ppId>   (ppId = "tt123" for movie, "tt123:S:E" for series)
@@ -337,7 +356,7 @@ async function extractDetails(url) {
     const meta = data.meta || {};
     details[0].description = meta.description || meta.overview || "";
     details[0].aliases = meta.genres ? meta.genres.join(", ") : "";
-    details[0].airdate = meta.released || meta.releaseInfo || "";
+    details[0].airdate = formatAirdate(meta.released || meta.releaseInfo || "");
   } catch (e) {
     console.log("[penguplay] details error: " + e);
   }
@@ -360,9 +379,14 @@ async function extractEpisodes(url) {
       vids.sort(function (a, b) {
         return (a.season - b.season) || (a.episode - b.episode);
       });
-      vids.forEach(function (v, i) {
+      // `number` must be the per-season episode number, NOT a running count.
+      // The app detects season boundaries by watching for the episode number
+      // to reset, so 1..10, 1..9, 1..8 splits into three seasons while a
+      // sequential 1..35 renders as one flat 35-episode list. The sort above
+      // (season, then episode) is what makes those resets land in order.
+      vids.forEach(function (v) {
         const ppId = parsed.ppId + ":" + v.season + ":" + v.episode;
-        eps.push({ href: url + "#" + ppId, number: i + 1 });
+        eps.push({ href: url + "#" + ppId, number: v.episode });
       });
     }
     console.log("[penguplay] episodes -> " + eps.length);
