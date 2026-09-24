@@ -9,7 +9,7 @@
   "version": "1.0.2",
   "language": "Multi",
   "streamType": "HLS",
-  "quality": "2160",
+  "quality": "1080p/4K",
   "baseUrl": "https://pengu.uk/",
   "searchBaseUrl": "https://pengu.uk/",
   "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/PenguPlay/PenguPlay.js",
