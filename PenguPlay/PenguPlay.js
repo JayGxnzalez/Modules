@@ -18,6 +18,9 @@ const AUTH_TOKEN = "SCLz87P2nS1zZo1bUrt_thOZFcq6ERJr5L00glctYmQ";  // required, 
 const SERVER_FILTERS = {};  // PenguPlay-side filters, e.g. { res_360: "unchecked" }
 const MIN_RES = 0;          // on-device: e.g. 480 to hide anything below 480p
 const BLOCK_SOURCES = [];   // on-device: e.g. ["MovieBox"] to hide a provider
+const HIDE_UNPLAYABLE = true;   // drop .mkv/.mpd outright — AVFoundation can't
+                                // open them, so they're dead entries. Set false
+                                // if a build ever ships VLCKit/mpv, which can.
 
 // PenguPlay takes its config as a URL-encoded JSON path segment.
 const CONFIG_SEG = AUTH_TOKEN
@@ -183,6 +186,33 @@ async function resolveStremioSubtitles(ppId, type) {
   }
 }
 
+// Container support. The player reports "Item failed: Cannot Open" on Matroska
+// and DASH, which is AVFoundation behaviour: it handles MP4/M4V/MOV and HLS,
+// but not .mkv or .mpd. Measured on tt30825738: 24 of 41 streams were .mkv and
+// 4 were .mpd, and because the picker was sorted by resolution alone every 4K
+// MKV sat above the handful of playable MP4s.
+const PLAY_YES = 2, PLAY_MAYBE = 1, PLAY_NO = 0;
+
+function containerInfo(s) {
+  const url = String(s.url || "");
+  const fn = String((s.behaviorHints && s.behaviorHints.filename) || "");
+  const hay = (url + " " + fn).toLowerCase();
+  // Test the path only — query strings carry signatures full of stray chars.
+  const path = url.split("?")[0].toLowerCase();
+  if (path.indexOf(".m3u8") > -1) return { ext: "HLS", play: PLAY_YES };
+  if (/\.(mp4|m4v|mov)(\b|$)/.test(path) || /\.(mp4|m4v|mov)\b/.test(fn.toLowerCase())) {
+    return { ext: "MP4", play: PLAY_YES };
+  }
+  if (path.indexOf(".mpd") > -1 || hay.indexOf("dash") > -1) {
+    return { ext: "DASH", play: PLAY_NO };
+  }
+  if (path.indexOf(".mkv") > -1 || hay.indexOf("mkv") > -1) {
+    return { ext: "MKV", play: PLAY_NO };
+  }
+  // Extensionless (e.g. PixelDrain short links) — unknown until tried.
+  return { ext: "", play: PLAY_MAYBE };
+}
+
 // Pull "type" (movie|series) and the pp id out of the internal href.
 // detail href : https://v3-cinemeta.strem.io/meta/<type>/<id>.json
 // episode href: ...same... #<ppId>   (ppId = "tt123" for movie, "tt123:S:E" for series)
@@ -280,6 +310,7 @@ async function extractStreamUrl(url) {
   let osList = [];
   let nativeCount = 0;
   let authBlocked = false;
+  let skippedUnplayable = 0;
 
   try {
     // All three in parallel — OpenSubtitles adds no wall-clock time.
@@ -307,13 +338,17 @@ async function extractStreamUrl(url) {
       if (BLOCK_SOURCES.some(function (b) {
         return source.toLowerCase().indexOf(b.toLowerCase()) > -1;
       })) return;
-      const title = [ri.label, source].filter(Boolean).join(" • ") ||
+      const ci = containerInfo(s);
+      if (HIDE_UNPLAYABLE && ci.play === PLAY_NO) { skippedUnplayable++; return; }
+      // Container goes in the title so an unplayable pick is obvious up front.
+      const title = [ri.label, ci.ext, source].filter(Boolean).join(" • ") ||
                     (s.name || "PenguPlay");
       // Dual-key emission (HydraHD convention): different Shirox/Sora/Luna
       // builds read different keys, so emit both spellings of each. Each app
       // reads the key it knows and ignores the other.
       streams.push({
         _rank: ri.rank,
+        _play: ci.play,
         _size: bh.videoSize || 0,
         title: title, name: title, quality: ri.label || title,
         streamUrl: s.url, url: s.url,
@@ -322,10 +357,15 @@ async function extractStreamUrl(url) {
       });
     });
 
+    // Playability outranks resolution: a 1080p MP4 that plays beats a 4K MKV
+    // that cannot open. Within the same tier, highest resolution then largest
+    // file wins.
     streams.sort(function (a, b) {
-      return (b._rank - a._rank) || (b._size - a._size);
+      return (b._play - a._play) || (b._rank - a._rank) || (b._size - a._size);
     });
-    streams.forEach(function (s) { delete s._rank; delete s._size; });
+    streams.forEach(function (s) {
+      delete s._rank; delete s._play; delete s._size;
+    });
 
     (subData.subtitles || []).forEach(function (t) {
       if (!t || !t.url) return;
@@ -350,7 +390,16 @@ async function extractStreamUrl(url) {
                     ? "token present but rejected (invalid, revoked or out of quota)."
                     : "no AUTH_TOKEN set; PenguPlay returns no streams without one."));
     }
+    const mix = {};
+    streams.forEach(function (s) {
+      const k = (s.title.match(/\b(HLS|MP4|DASH|MKV)\b/) || [, "?"])[1];
+      mix[k] = (mix[k] || 0) + 1;
+    });
     console.log("[penguplay] streams=" + streams.length +
+                " containers={" + Object.keys(mix).map(function (k) {
+                  return k + ":" + mix[k];
+                }).join(" ") + "}" +
+                (skippedUnplayable ? " hidden=" + skippedUnplayable : "") +
                 " rawsubs=" + subtitles.length +
                 " (native=" + nativeCount + " os=" + osList.length + ")" +
                 " (" + type + "/" + ppId + ")");
