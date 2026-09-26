@@ -318,7 +318,8 @@ function audioInfo(s) {
     const lang = m[1].toLowerCase();
     if (m[2].toLowerCase() === "dub") {
       // Dubbed: the audio really is this language.
-      return { kind: "audio", label: langFlag(lang) + " " + langName(lang) };
+      const f = langFlag(lang);
+      return { kind: "audio", label: f === "🏳️" ? langName(lang) : f };
     }
     // Subbed: audio stays original, so there's nothing to flag. The embedded
     // subtitle language is not worth labelling — OpenSubtitles already feeds
@@ -358,16 +359,16 @@ function audioInfo(s) {
   if (parts.length === 0) return null;
   // A lone English track is the unremarkable default — nothing to flag.
   if (parts.length === 1 && /^(english|eng|en)$/i.test(parts[0])) return null;
-  // Multi-language: flags alone. Spelling out every name ("🇬🇧 English
-  // 🇪🇸 Spanish 🇮🇳 Hindi") overruns the row, and the flags are what carry
-  // the information. A single language keeps its name for clarity.
-  if (parts.length > 1) {
-    return {
-      kind: "audio",
-      label: parts.map(function (p) { return langFlag(p); }).join(" ")
-    };
-  }
-  return { kind: "audio", label: langFlag(parts[0]) + " " + langName(parts[0]) };
+  // Flags only — the flag is the indicator, the name just lengthens the row.
+  // The exception is a language with no flag in the table: a bare 🏳️ says
+  // nothing, so those keep their name.
+  return {
+    kind: "audio",
+    label: parts.map(function (p) {
+      const f = langFlag(p);
+      return f === "🏳️" ? langName(p) : f;
+    }).join(" ")
+  };
 }
 
 function titleCase(s) {
