@@ -148,9 +148,22 @@ async function extractStreamUrl(url) {
             return JSON.stringify({ streams: [], subtitle: "" });
         }
 
-        // Dub-only: keep buttons whose audio track isn't Japanese
-        const dubButtons = buttons.filter(btn => btn.audio !== "jpn");
-        console.log("[Animepahe-DUB] Dub buttons found: " + dubButtons.length);
+        // Dub-only: keep buttons whose audio track is English specifically.
+        // (Some releases carry multiple non-Japanese dubs, e.g. "chi" alongside
+        // "eng" — filtering on "!== jpn" let those Chinese tracks slip through.)
+        let dubButtons = buttons.filter(btn => btn.audio === "eng");
+        console.log("[Animepahe-DUB] English dub buttons found: " + dubButtons.length);
+
+        if (dubButtons.length === 0) {
+            // No "eng"-tagged track at all — fall back to any non-Japanese dub
+            // rather than returning nothing, but log it clearly since it may
+            // not actually be English.
+            const otherDub = buttons.filter(btn => btn.audio !== "jpn");
+            if (otherDub.length > 0) {
+                console.warn("[Animepahe-DUB] No 'eng' tagged track; falling back to non-Japanese audio: " + otherDub.map(b => b.audio).join(", "));
+                dubButtons = otherDub;
+            }
+        }
 
         if (dubButtons.length === 0) {
             console.warn("[Animepahe-DUB] No dub audio tracks available for this episode.");
