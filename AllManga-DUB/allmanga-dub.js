@@ -15,22 +15,24 @@ const EPISODE_QUERY = 'query($showId: String!$translationType: VaildTranslationT
 
 const SOURCE_PRIORITY = ['Default', 'Yt-mp4', 'S-Mp4', 'Ak', 'Uv-mp4', 'Luf-Mp4', 'Mp4'];
 
-// Known-good keygen snapshot (build 141, epoch 2956) — captured live on
-// 2026-08-28 via mkissa.to bootstrap (partB EP0wX+zZTEm8U+mdTgdy4kvwvLm5jXb/sx+YmPAhc7s=).
-// Verified end-to-end: episode → tobeparsed → clock → HLS (One Piece ep1, Clannad ep1).
-// The mask for this build is 44e9dea3f2eb669f7db83ceacf38a82cc12dfa33c16b0f105e35e9095c26808c
-// (vy(141) via page's crypto.subtle). Boot token 8fe794b2df3543d78aaadf449396cc690a32732a69e12c37095388262c67d59d
-// validated. Keep this fallback fresh — the bootstrap endpoint is now Cloudflare-
-// protected and the old mask blocks (build 136) no longer derive the correct key.
+// Known-good keygen snapshot (build 175, epoch 2960, lane k7) — captured live
+// on 2026-09-25 via mkissa.to bootstrap (k7 partB 9+ufk02f8FnAItXm62MzUviGiqFuTB16tFgly1URwr0=).
+// Key = partB XOR mask(175); mask blocks/consts extracted from the mkissa.to
+// crypto chunk BEkTyDAE.js (build 175).
+// Boot token algorithm (two-stage HMAC, build 175):
+//   f    = HMAC(mask, AA_BOOT_PREFIX + build_id)
+//   boot = hex(HMAC(f, buildId|group|host|epoch|lane))   // "|" -joined
+// Note: content lanes are routed per persisted query — chapterPages runs on
+// k9, episode on k7, music on k2. This module only calls episode, so k7.
 const FALLBACK_KEYGEN = {
-    build_id: '141',
-    epoch: 2956,
+    build_id: '175',
+    epoch: 2960,
     lane: 'k7',
-    key: '5414eefc1e322ad6c1ebd577813fdace8add468a78e679efed2a7191ac07f337',
+    key: '64642f3d5c51401e26207d3649a6753fb4264069563b547270cb98cb051bd04a',
     static_key: 'Xot36i3lK3:v1'
 };
 
-/* Self-bootstrap inputs (extracted from the mkissa.to crypto chunk, build 136).
+/* Self-bootstrap inputs (extracted from the mkissa.to crypto chunk, build 175).
    The client derives its own AES key without any secret server round-trip:
      embed[i]   = concat(base64decode(mask blocks))          [32 bytes]
      salt[i]    = (buildId.charCodeAt(i % len) || 0)
@@ -38,17 +40,18 @@ const FALLBACK_KEYGEN = {
      linear[i]  = ((i >> 3) * AA_FRAG_MUL + (i % 8) * AA_FRAG_ADD) & 255
      mask[i]    = embed[i] ^ salt[i] ^ linear[i]
      hmacKey    = HMAC-SHA256(mask, AA_BOOT_PREFIX + buildId)
-     bootTok    = hex(HMAC-SHA256(hmacKey, `${epoch}~${host}~${lane}~${group}~${buildId}`))
+     bootTok    = hex(HMAC-SHA256(hmacKey, `${buildId}|${group}|${host}|${epoch}|${lane}`))
      GET {AA_BOOTSTRAP_URL}?buildId=<id>&k=<lane>  (x-build-id / x-aa-boot headers)
      key        = first32(base64decode(partB)) XOR mask
    Epochs are 7-day (floor(now/604800000)); during the first day of an epoch the
-   previous one is still accepted. group is "mkissa" for the public hosts. */
-const AA_MASK_BLOCKS = ['C/MxHPiUyYU=', '7YC5Mv+l6BQ=', 'NXRbzxDSa0k=', 'jEqrE6v8gvM='];
-const AA_SALT_MUL = 236;
-const AA_SALT_ADD = 126;
-const AA_FRAG_MUL = 127;
-const AA_FRAG_ADD = 68;
-const AA_BOOT_PREFIX = 'c6Ud2qgHcL:';
+   previous one is still accepted. group is "mkissa" for the public hosts, and
+   the boot message uses the FULL host (with TLD), not the stripped first segment. */
+const AA_MASK_BLOCKS = ['jfTMXeWz1KY=', 'sSiL9IX1c1k=', 'jjOcW/T0DYU=', 'vRF6mguezW8='];
+const AA_SALT_MUL = 34;
+const AA_SALT_ADD = 47;
+const AA_FRAG_MUL = 93;
+const AA_FRAG_ADD = 29;
+const AA_BOOT_PREFIX = 'X8S061oCq:';
 const AA_WEEK_MS = 604800000;
 const AA_DAY_MS = 86400000;
 const AA_BOOTSTRAP_URL = 'https://api.mkissa.net/client-crypto/v1/bootstrap';
@@ -62,7 +65,7 @@ const CDN_BASES = [
 
 let aaKeyCache = { keys: null, ts: 0 };
 
-if (typeof console !== 'undefined') console.log('AllManga (DUB) v1.4.2');
+if (typeof console !== 'undefined') console.log('AllManga (DUB) v1.5.0 (build 175 keygen, k7 episode lane)');
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -96,7 +99,7 @@ async function searchResults(keyword) {
             // DUB-only module: hide shows with no dubbed episodes.
             const dubCount = (show.availableEpisodes && show.availableEpisodes.dub) || 0;
             if (!dubCount) return;
-            const href = `${BASE_URL}/bangumi/${show._id}`;
+            const href = `${BASE_URL}/anime/${show._id}`;
             const title = cleanText(show.englishName || show.name || '');
             if (!title || !show._id || seen.has(href)) return;
             seen.add(href);
@@ -157,7 +160,7 @@ async function extractEpisodes(url) {
             .filter(ep => ep.episodeIdNum !== undefined && ep.episodeIdNum !== null)
             .filter(ep => !dubSet.size || dubSet.has(String(ep.episodeIdNum)))
             .map(ep => ({
-                href: `${BASE_URL}/bangumi/${showId}/p-${ep.episodeIdNum}`,
+                href: `${BASE_URL}/anime/${showId}/p-${ep.episodeIdNum}`,
                 number: ep.episodeIdNum
             }))
             .sort((a, b) => a.number - b.number);
@@ -298,10 +301,11 @@ async function aaBootstrapFor(lane, epoch) {
     try {
         const mask = aaBuildMask(String(FALLBACK_KEYGEN.build_id));
         const hmacKey = aaHmacSha256(mask, aaAscii(AA_BOOT_PREFIX + FALLBACK_KEYGEN.build_id));
-        // mkissa build 141: message is lane/epoch/buildId/group/host with "/" (captured live: k7/2956/141/mkissa/mkissa.to)
-        // Keep the old "~" format as fallback for older builds.
-        const msgNew = lane + '/' + epoch + '/' + FALLBACK_KEYGEN.build_id + '/' + AA_BOOT_GROUP + '/' + AA_BOOT_HOST;
-        const msgOld = epoch + '~' + AA_BOOT_HOST + '~' + lane + '~' + AA_BOOT_GROUP + '~' + FALLBACK_KEYGEN.build_id;
+        // mkissa build 175: message is buildId|group|host|epoch|lane joined by "|"
+        // (live: "175|mkissa|mkissa.to|2960|k7"). Builds 166/141 used
+        // group:lane:epoch:host:buildId with ":" — kept as the older format.
+        const msgNew = [FALLBACK_KEYGEN.build_id, AA_BOOT_GROUP, AA_BOOT_HOST, String(epoch), lane].join('|');
+        const msgOld = AA_BOOT_GROUP + ':' + lane + ':' + epoch + ':' + AA_BOOT_HOST + ':' + FALLBACK_KEYGEN.build_id;
         // Try new format first
         let bootTok = aaHex(aaHmacSha256(hmacKey, aaAscii(msgNew)));
         // We will try new token first; if the server rejects (403) we could retry with old, but
@@ -393,12 +397,15 @@ async function aaFetchRemoteKeys(lane) {
     return null;
 }
 
-function aaBuildToken(keys, qh, ts) {
+function aaBuildToken(keys, qh, ts, legacyIv) {
     const payload = '{"v":1,"ts":' + ts + ',"epoch":' + keys.epoch + ',"buildId":"' + keys.build_id + '","qh":"' + qh + '","k":"' + keys.lane + '"}';
-    // mkissa build 141: IV is SHA256(epoch:qh:ts)[0:12] (anipy style, verified live 2026-08-28
-    // against https://api.mkissa.net/api with partB EP0wX+zZT... and key 5414eefc...).
-    // Previous builds used epoch:buildId:qh:ts:lane — kept as fallback if the new IV fails.
-    const iv = aaSha256(aaAscii(keys.epoch + ':' + qh + ':' + ts)).slice(0, 12);
+    // mkissa build 175: IV = SHA256(epoch:buildId:qh:ts:lane)[0:12] (the site's ET() chunk).
+    // Build 141 used the shorter SHA256(epoch:qh:ts) (anipy style) — pass legacyIv=true
+    // to retry with that composition when the site rolls the derivation back.
+    const ivBase = legacyIv
+        ? keys.epoch + ':' + qh + ':' + ts
+        : keys.epoch + ':' + keys.build_id + ':' + qh + ':' + ts + ':' + keys.lane;
+    const iv = aaSha256(aaAscii(ivBase)).slice(0, 12);
     const sealed = aaGcmSeal(aaHexToBytes(keys.key), iv, aaAscii(payload));
     const blob = new Uint8Array(1 + 12 + sealed.out.length + 16);
     blob[0] = 1;
@@ -432,12 +439,31 @@ async function aaEpisodeQuery(keys, showId, tt, episode) {
         const hasTbp = !!(json.data && json.data.tobeparsed);
         const dataKeys = (json.data && typeof json.data === 'object') ? Object.keys(json.data).join(',') : 'none';
         console.log('Episode response from ' + host + ': tbp=' + hasTbp + ' err=' + (errMsg || '-').slice(0, 80) + ' data=' + dataKeys);
-        // Rate limited / captcha-gated. Upstream waits and retries here, but
-        // that needs setTimeout, which throws on Sora/Luna's JavaScriptCore.
-        // The limit is per-host, so move straight to the next host instead.
-        if (errMsg.indexOf('Too many requests') === 0 || errMsg.indexOf('NEED_CAPTCHA') === 0) {
+        // Rate limited. Upstream waits and retries here, but that needs
+        // setTimeout, which throws on Sora/Luna's JavaScriptCore. The limit is
+        // per-host, so move straight to the next host instead.
+        if (errMsg.indexOf('Too many requests') === 0) {
             rateLimited = true;
             console.log('Episode rate limited on ' + host + ' (' + errMsg.slice(0, 40) + '); trying next host');
+            continue;
+        }
+        // NEED_CAPTCHA can also mean our IV composition is one revision behind
+        // the live site. Retry this host once with the legacy epoch:qh:ts IV
+        // before giving up on it.
+        if (errMsg.indexOf('NEED_CAPTCHA') === 0) {
+            rateLimited = true;
+            const legacyExt = {
+                persistedQuery: { version: 1, sha256Hash: qh },
+                aaReq: aaBuildToken(keys, qh, ts, true),
+                k: keys.lane
+            };
+            const legacyJson = await aaSendEpisodeRequest(host, 'GET', null, variables, legacyExt, keys);
+            const legacyErr = (legacyJson && legacyJson.errors && legacyJson.errors[0] && legacyJson.errors[0].message) || '';
+            if (legacyJson && legacyJson.data && (legacyJson.data.tobeparsed || legacyJson.data.episode)) {
+                console.log('Episode legacy-IV succeeded on ' + host);
+                return legacyJson;
+            }
+            console.log('Episode NEED_CAPTCHA on ' + host + ' (both IVs: ' + (legacyErr || '-').slice(0, 40) + '); trying next host');
             continue;
         }
         if (errMsg.indexOf('AA_CRYPTO') === 0) {
@@ -1352,12 +1378,14 @@ function unpack(source) {
 }
 
 function extractShowId(url) {
-    const match = String(url || '').match(/\/bangumi\/([^\/?#]+)/);
+    // Accept both the new /anime/ scheme and the old /bangumi/ one so entries
+    // already saved in a user's library keep resolving.
+    const match = String(url || '').match(/\/(?:anime|bangumi)\/([^\/?#]+)/);
     return match ? match[1] : '';
 }
 
 function parseEpisodeUrl(url) {
-    const match = String(url || '').match(/\/bangumi\/([^\/?#]+)\/p-([^\/?#]+)/);
+    const match = String(url || '').match(/\/(?:anime|bangumi)\/([^\/?#]+)\/p-([^\/?#]+)/);
     return match ? { showId: match[1], episode: match[2] } : null;
 }
 
