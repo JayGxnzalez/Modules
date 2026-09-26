@@ -65,7 +65,7 @@ const CDN_BASES = [
 
 let aaKeyCache = { keys: null, ts: 0 };
 
-if (typeof console !== 'undefined') console.log('AllManga (DUB) v1.5.0 (build 175 keygen, k7 episode lane)');
+if (typeof console !== 'undefined') console.log('AllManga (DUB) v1.5.1 (build 175 keygen, k7 episode lane)');
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -90,15 +90,26 @@ async function searchResults(keyword) {
         const query = String(keyword || '').trim();
         if (!query) return JSON.stringify([]);
 
-        const data = await gql(`{shows(search:{sortBy:Trending,query:${JSON.stringify(query)}},limit:26,page:1){edges{_id name englishName nativeName thumbnail availableEpisodes}}}`);
+        const data = await gql(`{shows(search:{sortBy:Trending,query:${JSON.stringify(query)}},limit:26,page:1){edges{_id name englishName nativeName thumbnail availableEpisodes availableEpisodesDetail}}}`);
         const shows = (((data || {}).shows || {}).edges) || [];
 
         const results = [];
         const seen = new Set();
         shows.forEach(show => {
             // DUB-only module: hide shows with no dubbed episodes.
-            const dubCount = (show.availableEpisodes && show.availableEpisodes.dub) || 0;
-            if (!dubCount) return;
+            //
+            // availableEpisodes is only a counter and goes stale on some entries
+            // (Saga of Tanya the Evil reported dub:0 while the dub list was
+            // populated), so availableEpisodesDetail.dub is the authoritative
+            // check — same field extractEpisodes trusts. If NEITHER field comes
+            // back, fail open and keep the show rather than hiding a real result;
+            // extractEpisodes will show 0 episodes if it truly has no dub.
+            const detail = show.availableEpisodesDetail;
+            const detailDub = (detail && detail.dub) || null;
+            const countDub = (show.availableEpisodes && show.availableEpisodes.dub) || 0;
+            const knowsDub = !!detail || !!show.availableEpisodes;
+            const hasDub = (detailDub && detailDub.length > 0) || countDub > 0;
+            if (knowsDub && !hasDub) return;
             const href = `${BASE_URL}/anime/${show._id}`;
             const title = cleanText(show.englishName || show.name || '');
             if (!title || !show._id || seen.has(href)) return;
