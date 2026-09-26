@@ -72,12 +72,20 @@ async function getJSON(url, headers) {
 // 2160/1080/720/480/360 list would silently drop to rank 0 and mislabel.
 function resInfo(s) {
   const hay = ((s.name || "") + " " + ((s.behaviorHints && s.behaviorHints.filename) || "")).toLowerCase();
-  if (hay.indexOf("2160") > -1 || hay.indexOf("4k") > -1 || hay.indexOf("uhd") > -1) {
+  // An explicit <digits>p token is checked FIRST and wins. The loose "4k"
+  // marker can't lead, because provider names contain it — "1080p • 4KHDHub"
+  // was being reported as 4K purely because of the word "4KHDHub".
+  const mp = hay.match(/(\d{3,4})p\b/);
+  if (mp) {
+    const n = parseInt(mp[1], 10);
+    return { rank: n, label: n >= 2160 ? "4K" : mp[1] + "p" };
+  }
+  // No explicit height — fall back to loose markers, ignoring the provider
+  // token so "4KHDHub" alone never counts as a 4K claim.
+  const loose = hay.replace(/4khdhub/g, " ");
+  if (loose.indexOf("2160") > -1 || loose.indexOf("4k") > -1 || loose.indexOf("uhd") > -1) {
     return { rank: 2160, label: "4K" };
   }
-  // Any <digits>p token, e.g. 1080p / 720p / 266p / 144p.
-  const mp = hay.match(/(\d{3,4})p/);
-  if (mp) return { rank: parseInt(mp[1], 10), label: mp[1] + "p" };
   // Bare height, e.g. "1080 adaptive".
   const mb = hay.match(/\b(2160|1440|1080|720|480|360|240)\b/);
   if (mb) return { rank: parseInt(mb[1], 10), label: mb[1] + "p" };
@@ -214,16 +222,19 @@ function containerInfo(s) {
   const hay = (url + " " + fn).toLowerCase();
   // Test the path only — query strings carry signatures full of stray chars.
   const path = url.split("?")[0].toLowerCase();
+  // The URL path is authoritative and is checked first: a DASH manifest whose
+  // `filename` hint claims .mp4 must still be read as DASH, not as playable.
   if (path.indexOf(".m3u8") > -1) return { ext: "HLS", play: PLAY_YES };
-  if (/\.(mp4|m4v|mov)(\b|$)/.test(path) || /\.(mp4|m4v|mov)\b/.test(fn.toLowerCase())) {
-    return { ext: "MP4", play: PLAY_YES };
-  }
-  if (path.indexOf(".mpd") > -1 || hay.indexOf("dash") > -1) {
-    return { ext: "DASH", play: PLAY_NO };
-  }
-  if (path.indexOf(".mkv") > -1 || hay.indexOf("mkv") > -1) {
-    return { ext: "MKV", play: PLAY_NO };
-  }
+  if (path.indexOf(".mpd") > -1) return { ext: "DASH", play: PLAY_NO };
+  if (path.indexOf(".mkv") > -1) return { ext: "MKV", play: PLAY_NO };
+  if (/\.(mp4|m4v|mov)(\b|$)/.test(path)) return { ext: "MP4", play: PLAY_YES };
+  // Path carried no extension (signed/short links) — fall back to the hint.
+  const f = fn.toLowerCase();
+  if (/\.mpd\b/.test(f)) return { ext: "DASH", play: PLAY_NO };
+  if (/\.mkv\b/.test(f)) return { ext: "MKV", play: PLAY_NO };
+  if (/\.(mp4|m4v|mov)\b/.test(f)) return { ext: "MP4", play: PLAY_YES };
+  if (hay.indexOf("dash") > -1) return { ext: "DASH", play: PLAY_NO };
+  if (hay.indexOf("mkv") > -1) return { ext: "MKV", play: PLAY_NO };
   // Extensionless (e.g. PixelDrain short links) — unknown until tried.
   return { ext: "", play: PLAY_MAYBE };
 }
@@ -245,6 +256,144 @@ function formatAirdate(v) {
   const name = MONTH_NAMES[parseInt(m[2], 10) - 1];
   if (!name) return m[1] + "-" + m[2] + "-" + m[3];
   return name + " " + parseInt(m[3], 10) + ", " + m[1];
+}
+
+// Flag emoji by language name, keyed on the words PenguPlay actually uses in
+// its bingeGroup and "Audio:" lines. Anything unmapped gets a neutral flag.
+const LANG_FLAG = {
+  english: "🇬🇧", eng: "🇬🇧", en: "🇬🇧",
+  // Spanish splits by region: Spain gets 🇪🇸, Latin American Spanish 🇲🇽.
+  // PenguPlay writes LatAm as "esla"/"spl"/"latino"/"latam" depending on
+  // provider, so all of those route to the Mexican flag.
+  spanish: "🇪🇸", spa: "🇪🇸", castellano: "🇪🇸",
+  esla: "🇲🇽", spl: "🇲🇽", latino: "🇲🇽", latam: "🇲🇽", "es-la": "🇲🇽",
+  "es-419": "🇲🇽", mexican: "🇲🇽",
+  portuguese: "🇵🇹", ptbr: "🇧🇷", "pt-br": "🇧🇷", pob: "🇧🇷", brazilian: "🇧🇷",
+  french: "🇫🇷", german: "🇩🇪",
+  italian: "🇮🇹", russian: "🇷🇺", ukr: "🇺🇦", ukrainian: "🇺🇦",
+  hindi: "🇮🇳", tamil: "🇮🇳", telugu: "🇮🇳", malayalam: "🇮🇳",
+  arabic: "🇸🇦", kurdish: "🏳️", turkish: "🇹🇷", polish: "🇵🇱",
+  japanese: "🇯🇵", korean: "🇰🇷", chinese: "🇨🇳", thai: "🇹🇭",
+  vietnamese: "🇻🇳", indonesian: "🇮🇩", malay: "🇲🇾", dutch: "🇳🇱",
+  greek: "🇬🇷", swedish: "🇸🇪", finnish: "🇫🇮", danish: "🇩🇰",
+  norwegian: "🇳🇴", hungarian: "🇭🇺", czech: "🇨🇿", romanian: "🇷🇴",
+  hebrew: "🇮🇱", bulgarian: "🇧🇬", croatian: "🇭🇷", serbian: "🇷🇸",
+  persian: "🇮🇷", filipino: "🇵🇭", tagalog: "🇵🇭"
+};
+
+function langFlag(name) {
+  return LANG_FLAG[String(name || "").toLowerCase().trim()] || "🏳️";
+}
+
+// MovieBox uses a few internal codes in its bingeGroup that aren't words:
+// "ptbr" for Brazilian Portuguese, "esla" for Latin American Spanish.
+const LANG_DISPLAY = {
+  ptbr: "Portuguese (BR)", pob: "Portuguese (BR)", "pt-br": "Portuguese (BR)",
+  brazilian: "Portuguese (BR)",
+  esla: "Spanish (LatAm)", spl: "Spanish (LatAm)", latino: "Spanish (LatAm)",
+  latam: "Spanish (LatAm)", "es-la": "Spanish (LatAm)",
+  "es-419": "Spanish (LatAm)", castellano: "Spanish (Spain)",
+  ukr: "Ukrainian", zht: "Chinese (Traditional)", zho: "Chinese",
+  eng: "English", spa: "Spanish", en: "English"
+};
+
+function langName(name) {
+  const k = String(name || "").toLowerCase().trim();
+  return LANG_DISPLAY[k] || titleCase(k);
+}
+
+// Audio vs subtitle language for a MovieBox-style variant.
+//
+// MovieBox ships one stream PER language rather than one file with switchable
+// tracks, and its bingeGroup marks which kind each one is:
+//   ...-russian-dub-720p   -> Russian AUDIO  (filename: Fight.Club.1999.Russian.720p.mp4)
+//   ...-russian-sub-1080p  -> original audio, Russian SUBS (filename has no language)
+// PenguPlay's "🎧 Audio: Russian" line says "Russian" for BOTH, so trusting it
+// alone mislabels every sub variant as if it were dubbed. The filename pattern
+// (language present only on dubs) is what confirms the distinction.
+function audioInfo(s) {
+  const bg = String((s.behaviorHints && s.behaviorHints.bingeGroup) || "");
+  const m = bg.match(/-([a-z]+)-(dub|sub)-/i);
+  if (m) {
+    const lang = m[1].toLowerCase();
+    if (m[2].toLowerCase() === "dub") {
+      // Dubbed: the audio really is this language.
+      return { kind: "audio", label: langFlag(lang) + " " + langName(lang) };
+    }
+    // Subbed: audio stays original, so there's nothing to flag. The embedded
+    // subtitle language is not worth labelling — OpenSubtitles already feeds
+    // 30-40 languages to every title regardless of which stream is picked.
+    return null;
+  }
+  // No bingeGroup marker — fall back to the description's Audio: line. A file
+  // listing several ("English, Hindi") really does carry multiple tracks.
+  const d = String(s.description || "");
+  const am = d.match(/Audio:\s*([^\n]+)/);
+  let parts = [];
+  if (am) {
+    parts = am[1].trim().split(/\s*,\s*/).filter(Boolean);
+  } else {
+    // Some dual-audio releases only declare it in the filename, as a bracketed
+    // track list: "[Hindi DDP 2.0 + English DTS-HD MA 5.1]". Pull the language
+    // words out of that, ignoring the codec/channel noise around them.
+    const fn = String((s.behaviorHints && s.behaviorHints.filename) || "");
+    const br = fn.match(/\[([^\]]+)\]/);
+    if (br) {
+      br[1].split(/\s*\+\s*/).forEach(function (chunk) {
+        const w = chunk.trim().split(/\s+/)[0];
+        if (w && Object.prototype.hasOwnProperty.call(LANG_FLAG, w.toLowerCase())) {
+          parts.push(w);
+        }
+      });
+    }
+  }
+  // De-dupe while preserving order, so "English + English 5.1" isn't doubled.
+  const seenLang = {};
+  parts = parts.filter(function (p) {
+    const k = String(p).toLowerCase().trim();
+    if (!k || seenLang[k]) return false;
+    seenLang[k] = true;
+    return true;
+  });
+  if (parts.length === 0) return null;
+  // A lone English track is the unremarkable default — nothing to flag.
+  if (parts.length === 1 && /^(english|eng|en)$/i.test(parts[0])) return null;
+  // Multi-language: flags alone. Spelling out every name ("🇬🇧 English
+  // 🇪🇸 Spanish 🇮🇳 Hindi") overruns the row, and the flags are what carry
+  // the information. A single language keeps its name for clarity.
+  if (parts.length > 1) {
+    return {
+      kind: "audio",
+      label: parts.map(function (p) { return langFlag(p); }).join(" ")
+    };
+  }
+  return { kind: "audio", label: langFlag(parts[0]) + " " + langName(parts[0]) };
+}
+
+function titleCase(s) {
+  const t = String(s || "");
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
+// Identity of the underlying file, for dropping streams that are the SAME file
+// listed twice. MovieBox indexes a title under several edition ids (plain and
+// "[Hindi]"), and some editions point at byte-identical files — e.g.
+// 6841cd06...mp4 appears under both 7148079028095045304 and 8137378744555162280.
+// The signed wrapper around it differs every request, so only the trailing
+// content hash identifies it. Generic manifest names (index_web.mpd,
+// index.m3u8) carry no identity of their own, so those take the parent
+// directory too — otherwise every MovieBox DASH rendition would collapse into
+// one. Host is included so short ids can't collide across providers.
+function contentKey(url) {
+  const raw = String(url || "");
+  const path = raw.split("?")[0];
+  const host = (path.split("/")[2] || "");
+  const segs = path.split("/").filter(Boolean);
+  const last = segs[segs.length - 1] || raw;
+  if (/^(index|master|list|playlist)[\w-]*\.(m3u8|mpd)$/i.test(last)) {
+    return host + "|" + (segs[segs.length - 2] || "") + "/" + last;
+  }
+  return host + "|" + last;
 }
 
 // Pull "type" (movie|series) and the pp id out of the internal href.
@@ -415,6 +564,8 @@ async function extractStreamUrl(url) {
   let nativeCount = 0;
   let authBlocked = false;
   let skippedUnplayable = 0;
+  let dupeCount = 0;
+  const seenFiles = {};
 
   try {
     // All three in parallel — OpenSubtitles adds no wall-clock time.
@@ -444,9 +595,16 @@ async function extractStreamUrl(url) {
       })) return;
       const ci = containerInfo(s);
       if (HIDE_UNPLAYABLE && ci.play === PLAY_NO) { skippedUnplayable++; return; }
-      // Container goes in the title so an unplayable pick is obvious up front.
-      const title = [ri.label, ci.ext, source].filter(Boolean).join(" • ") ||
-                    (s.name || "PenguPlay");
+      // Same underlying file listed under another edition id — not another
+      // option, just the same link twice. Different encodes keep their own row.
+      const ck = contentKey(s.url);
+      if (seenFiles[ck]) { dupeCount++; return; }
+      seenFiles[ck] = true;
+      // Container goes in the title so an unplayable pick is obvious up front;
+      // audio language distinguishes same-provider variants of one title.
+      const ai = audioInfo(s);
+      const title = [ri.label, ci.ext, source, ai ? ai.label : ""]
+                      .filter(Boolean).join(" • ") || (s.name || "PenguPlay");
       // Dual-key emission (HydraHD convention): different Shirox/Sora/Luna
       // builds read different keys, so emit both spellings of each. Each app
       // reads the key it knows and ignores the other.
@@ -504,6 +662,7 @@ async function extractStreamUrl(url) {
                   return k + ":" + mix[k];
                 }).join(" ") + "}" +
                 (skippedUnplayable ? " hidden=" + skippedUnplayable : "") +
+                (dupeCount ? " dupes=" + dupeCount : "") +
                 " rawsubs=" + subtitles.length +
                 " (native=" + nativeCount + " os=" + osList.length + ")" +
                 " (" + type + "/" + ppId + ")");
