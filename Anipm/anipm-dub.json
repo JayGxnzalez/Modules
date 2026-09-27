@@ -1,0 +1,20 @@
+{
+  "sourceName": "AniPM-DUB",
+  "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/AniPM-DUB/Icon.png",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.0.0",
+  "language": "English",
+  "streamType": "HLS",
+  "quality": "1080",
+  "baseUrl": "https://ani.pm/",
+  "searchBaseUrl": "https://ani.pm/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/AniPM-DUB/AniPM-DUB.js",
+  "type": "Anime",
+  "downloadSupport": true,
+  "asyncJS": true,
+  "softsub": true
+}
