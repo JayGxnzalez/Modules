@@ -1,0 +1,20 @@
+{
+  "sourceName": "ani.pm (SUB)",
+  "iconUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/Anipm/Icon.png",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.0.0",
+  "language": "Japanese",
+  "streamType": "HLS",
+  "quality": "1080",
+  "baseUrl": "https://ani.pm/",
+  "searchBaseUrl": "https://ani.pm/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/Anipm/anipm-sub.js",
+  "type": "Anime",
+  "downloadSupport": true,
+  "asyncJS": true,
+  "softsub": true
+}
