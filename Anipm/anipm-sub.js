@@ -383,12 +383,12 @@ async function extractEpisodes(url) {
     }
 }
 
-// Shirox's VTT parser ignores WebVTT's X-TIMESTAMP-MAP header, so cues that the
-// source times against the HLS MPEG-TS clock render offset (appear delayed).
-// This fetches the cue file, bakes the map offset into every timestamp, strips
-// the map line, and returns a data: URI Shirox parses correctly.
-// If subs end up shifted the WRONG way after testing, flip VTT_OFFSET_SIGN to 1.
-const VTT_OFFSET_SIGN = -1;
+// Shirox renders subs late (its VTT parser ignores X-TIMESTAMP-MAP, plus the
+// player has its own soft-sub lag). This fetches each cue file, strips the map
+// line, shifts every timestamp by SUB_OFFSET_SEC, and returns a data: URI.
+// SUB_OFFSET_SEC: seconds to nudge cues. NEGATIVE = earlier (sooner),
+// positive = later. If subs still feel delayed, make this more negative (e.g. -3).
+const SUB_OFFSET_SEC = 0;
 
 function vttSecToStamp(sec) {
     if (sec < 0) sec = 0;
@@ -421,15 +421,8 @@ async function normalizeVttTiming(subUrl, headers) {
         const stripped = content.charCodeAt(0) === 0xFEFF ? content.slice(1) : content;
         if (!/^WEBVTT/.test(stripped)) return subUrl; // not VTT (e.g. ASS/SRT) — leave as-is
 
-        const mapMatch = content.match(/X-TIMESTAMP-MAP=.*MPEGTS:(\d+).*?(?:LOCAL:(\d{2}:\d{2}:\d{2}[.,]\d{3}))?/i);
-        if (!mapMatch) return subUrl; // no map, nothing to correct
-
-        const mpegts = parseInt(mapMatch[1], 10);
-        const localSec = mapMatch[2] ? vttStampToSec(mapMatch[2]) : 0;
-        const offset = (mpegts / 90000) - localSec;
-        if (!offset || Math.abs(offset) < 0.001) return subUrl;
-
-        const shift = VTT_OFFSET_SIGN * offset;
+        const shift = SUB_OFFSET_SEC;
+        if (!shift || Math.abs(shift) < 0.001) return subUrl;
         const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
         const out = [];
         for (const line of lines) {
