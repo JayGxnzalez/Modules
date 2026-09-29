@@ -383,6 +383,73 @@ async function extractEpisodes(url) {
     }
 }
 
+// Shirox's VTT parser ignores WebVTT's X-TIMESTAMP-MAP header, so cues that the
+// source times against the HLS MPEG-TS clock render offset (appear delayed).
+// This fetches the cue file, bakes the map offset into every timestamp, strips
+// the map line, and returns a data: URI Shirox parses correctly.
+// If subs end up shifted the WRONG way after testing, flip VTT_OFFSET_SIGN to 1.
+const VTT_OFFSET_SIGN = -1;
+
+function vttSecToStamp(sec) {
+    if (sec < 0) sec = 0;
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    const ms = Math.round((sec - Math.floor(sec)) * 1000);
+    const pad = (n, l) => String(n).padStart(l, '0');
+    return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)}.${pad(ms, 3)}`;
+}
+
+function vttStampToSec(str) {
+    const t = str.trim().replace(',', '.');
+    const parts = t.split(':');
+    if (parts.length === 3) {
+        return (parseFloat(parts[0]) * 3600) + (parseFloat(parts[1]) * 60) + parseFloat(parts[2]);
+    } else if (parts.length === 2) {
+        return (parseFloat(parts[0]) * 60) + parseFloat(parts[1]);
+    }
+    return NaN;
+}
+
+async function normalizeVttTiming(subUrl, headers) {
+    try {
+        const res = await soraFetch(subUrl, { headers: headers || {} });
+        if (!res || typeof res.text !== 'function') return subUrl;
+        let content = await res.text();
+        if (!content) return subUrl;
+
+        const stripped = content.charCodeAt(0) === 0xFEFF ? content.slice(1) : content;
+        if (!/^WEBVTT/.test(stripped)) return subUrl; // not VTT (e.g. ASS/SRT) — leave as-is
+
+        const mapMatch = content.match(/X-TIMESTAMP-MAP=.*MPEGTS:(\d+).*?(?:LOCAL:(\d{2}:\d{2}:\d{2}[.,]\d{3}))?/i);
+        if (!mapMatch) return subUrl; // no map, nothing to correct
+
+        const mpegts = parseInt(mapMatch[1], 10);
+        const localSec = mapMatch[2] ? vttStampToSec(mapMatch[2]) : 0;
+        const offset = (mpegts / 90000) - localSec;
+        if (!offset || Math.abs(offset) < 0.001) return subUrl;
+
+        const shift = VTT_OFFSET_SIGN * offset;
+        const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+        const out = [];
+        for (const line of lines) {
+            if (/^X-TIMESTAMP-MAP=/i.test(line.trim())) continue; // drop the map line
+            if (line.includes('-->')) {
+                const shifted = line.replace(/(\d{2}:\d{2}:\d{2}[.,]\d{3}|\d{1,2}:\d{2}[.,]\d{3})/g, (m) => {
+                    const sec = vttStampToSec(m);
+                    return isNaN(sec) ? m : vttSecToStamp(sec + shift);
+                });
+                out.push(shifted);
+            } else {
+                out.push(line);
+            }
+        }
+        return 'data:text/vtt,' + encodeURIComponent(out.join('\n'));
+    } catch (e) {
+        return subUrl; // any failure → fall back to the original URL
+    }
+}
+
 async function extractStreamUrl(url) {
     try {
         const id = extractIdFromUrl(url);
@@ -545,6 +612,12 @@ async function extractStreamUrl(url) {
                 }
             } catch (err) {
             }
+        }
+
+        if (allSubs.length) {
+            await Promise.all(allSubs.map(async (t) => {
+                t.url = await normalizeVttTiming(t.url, { 'User-Agent': FIREFOX_UA });
+            }));
         }
 
         const result = { streams: streams };
