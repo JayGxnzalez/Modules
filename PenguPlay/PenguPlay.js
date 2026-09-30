@@ -209,12 +209,19 @@ async function resolveStremioSubtitles(ppId, type) {
   }
 }
 
-// Container support. The player reports "Item failed: Cannot Open" on Matroska
-// and DASH, which is AVFoundation behaviour: it handles MP4/M4V/MOV and HLS,
-// but not .mkv or .mpd. Measured on tt30825738: 24 of 41 streams were .mkv and
-// 4 were .mpd, and because the picker was sorted by resolution alone every 4K
-// MKV sat above the handful of playable MP4s.
+// Container support.
+//
+// Shirox added an MKV player, so Matroska now plays and is treated as fully
+// supported. This matters more than it sounds: MKV was 24 of 41 streams on
+// tt30825738, it's where the 4K releases live, and it's the ONLY container
+// carrying multi-track audio (the dual-audio "[Hindi DDP 2.0 + English DTS-HD
+// MA 5.1]" files) — so the multi-flag labels finally have something to label.
+//
+// DASH (.mpd) is still treated as unplayable: the MKV player is a Matroska
+// demuxer, not a DASH client, and nothing has been tested to say otherwise.
+// Flip DASH_PLAYABLE if MovieBox's .mpd streams turn out to work.
 const PLAY_YES = 2, PLAY_MAYBE = 1, PLAY_NO = 0;
+const DASH_PLAYABLE = false;
 
 function containerInfo(s) {
   const url = String(s.url || "");
@@ -224,17 +231,18 @@ function containerInfo(s) {
   const path = url.split("?")[0].toLowerCase();
   // The URL path is authoritative and is checked first: a DASH manifest whose
   // `filename` hint claims .mp4 must still be read as DASH, not as playable.
+  const DASH_PLAY = DASH_PLAYABLE ? PLAY_YES : PLAY_NO;
   if (path.indexOf(".m3u8") > -1) return { ext: "HLS", play: PLAY_YES };
-  if (path.indexOf(".mpd") > -1) return { ext: "DASH", play: PLAY_NO };
-  if (path.indexOf(".mkv") > -1) return { ext: "MKV", play: PLAY_NO };
+  if (path.indexOf(".mpd") > -1) return { ext: "DASH", play: DASH_PLAY };
+  if (path.indexOf(".mkv") > -1) return { ext: "MKV", play: PLAY_YES };
   if (/\.(mp4|m4v|mov)(\b|$)/.test(path)) return { ext: "MP4", play: PLAY_YES };
   // Path carried no extension (signed/short links) — fall back to the hint.
   const f = fn.toLowerCase();
-  if (/\.mpd\b/.test(f)) return { ext: "DASH", play: PLAY_NO };
-  if (/\.mkv\b/.test(f)) return { ext: "MKV", play: PLAY_NO };
+  if (/\.mpd\b/.test(f)) return { ext: "DASH", play: DASH_PLAY };
+  if (/\.mkv\b/.test(f)) return { ext: "MKV", play: PLAY_YES };
   if (/\.(mp4|m4v|mov)\b/.test(f)) return { ext: "MP4", play: PLAY_YES };
-  if (hay.indexOf("dash") > -1) return { ext: "DASH", play: PLAY_NO };
-  if (hay.indexOf("mkv") > -1) return { ext: "MKV", play: PLAY_NO };
+  if (hay.indexOf("dash") > -1) return { ext: "DASH", play: DASH_PLAY };
+  if (hay.indexOf("mkv") > -1) return { ext: "MKV", play: PLAY_YES };
   // Extensionless (e.g. PixelDrain short links) — unknown until tried.
   return { ext: "", play: PLAY_MAYBE };
 }
@@ -601,11 +609,14 @@ async function extractStreamUrl(url) {
       const ck = contentKey(s.url);
       if (seenFiles[ck]) { dupeCount++; return; }
       seenFiles[ck] = true;
-      // Container goes in the title so an unplayable pick is obvious up front;
-      // audio language distinguishes same-provider variants of one title.
+      // Container trails the row in brackets — with MKV playable it's a
+      // secondary detail (file size / quality expectation), not a warning, so
+      // resolution, provider and audio flags lead.
       const ai = audioInfo(s);
-      const title = [ri.label, ci.ext, source, ai ? ai.label : ""]
-                      .filter(Boolean).join(" • ") || (s.name || "PenguPlay");
+      const head = [ri.label, source, ai ? ai.label : ""].filter(Boolean).join(" • ");
+      const title = (head ? head + (ci.ext ? " • [" + ci.ext + "]" : "")
+                          : (ci.ext ? "[" + ci.ext + "]" : "")) ||
+                    (s.name || "PenguPlay");
       // Dual-key emission (HydraHD convention): different Shirox/Sora/Luna
       // builds read different keys, so emit both spellings of each. Each app
       // reads the key it knows and ignores the other.
@@ -655,7 +666,7 @@ async function extractStreamUrl(url) {
     }
     const mix = {};
     streams.forEach(function (s) {
-      const k = (s.title.match(/\b(HLS|MP4|DASH|MKV)\b/) || [, "?"])[1];
+      const k = (s.title.match(/\[(HLS|MP4|DASH|MKV)\]/) || [, "?"])[1];
       mix[k] = (mix[k] || 0) + 1;
     });
     console.log("[penguplay] streams=" + streams.length +
