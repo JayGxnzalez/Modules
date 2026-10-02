@@ -6,14 +6,14 @@
     "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
     "url": "https://github.com/JayGxnzalez"
   },
-  "version": "1.0.0",
+  "version": "1.0.0 logs",
   "language": "English",
   "streamType": "hls",
   "quality": "1080",
   "baseUrl": "https://reanime.to/",
   "searchBaseUrl": "https://reanime.to/",
   "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/Reanime/Reanime.js",
-  "type": "Movie/TV",
+  "type": "Anime",
   "downloadSupport": true,
   "asyncJS": true,
   "softsub": true
