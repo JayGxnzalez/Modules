@@ -230,13 +230,31 @@ function htmlUnescape(s) {
         .replace(/&amp;/g, '&');
 }
 
-// Pull every krussdomi cat-player URL out of the watch page's window.KAA.servers[].src
+// Pull every krussdomi cat-player URL out of the watch page's window.KAA.servers[].
+// SSR uses UNQUOTED keys (src:"...") and may escape slashes (\/ or \u002F), so we
+// match the krussdomi cat-player URL directly rather than keying off a "src" field.
 function extractServerSrcs(html) {
+    let text = String(html)
+        .replace(/\\u002[fF]/g, '/')
+        .replace(/\\\//g, '/');
+    text = htmlUnescape(text);
+
     const out = [];
-    const re = /"src"\s*:\s*"([^"]*(?:krussdomi|cat-player)[^"]*)"/g;
+    const seen = new Set();
+    function push(u) {
+        if (!u) return;
+        u = u.replace(/&amp;/g, '&');
+        if (!seen.has(u)) { seen.add(u); out.push(u); }
+    }
+
+    const re = /https?:\/\/[^\s"'\\]*krussdomi\.com\/cat-player\/player[^\s"'\\]*/g;
     let m;
-    while ((m = re.exec(html)) !== null) {
-        out.push(htmlUnescape(m[1]));
+    while ((m = re.exec(text)) !== null) push(m[0]);
+
+    // Fallback: protocol-relative or path-only cat-player references
+    if (!out.length) {
+        const re2 = /\/cat-player\/player\?[^\s"'\\]+/g;
+        while ((m = re2.exec(text)) !== null) push('https://krussdomi.com' + m[0]);
     }
     return out;
 }
@@ -295,7 +313,11 @@ async function resolveLang(slug, epNum, lang) {
 
         const srcs = extractServerSrcs(watchHtml);
         if (!srcs.length) {
-            log(lang + ': no krussdomi server in watch page (servers[] shape changed?)');
+            const hint = /just a moment|challenge-platform|cf-chl|cf_chl/i.test(watchHtml) ? 'CF challenge page (CFBypass not applied)'
+                : /krussdomi|cat-player/i.test(watchHtml) ? 'krussdomi present but URL not matched (escaping?)'
+                : /window\.KAA|servers/i.test(watchHtml) ? 'KAA present, no krussdomi server for this lang'
+                : 'no KAA/servers in body (SSR not returned?)';
+            log(lang + ': no krussdomi server — ' + hint + ' (len=' + watchHtml.length + ')');
             return null;
         }
 
