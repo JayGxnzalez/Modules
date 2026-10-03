@@ -53,6 +53,17 @@ function base64ToUint8(str) {
 function strBytes(s) { const o = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) o[i] = s.charCodeAt(i) & 0xff; return o; }
 function bytesToStr(b) { let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return s; }
 function toHex(b) { let s = ''; for (let i = 0; i < b.length; i++) s += b[i].toString(16).padStart(2, '0'); return s; }
+function uint8ToBase64(bytes) {
+  const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i], b1 = i + 1 < bytes.length ? bytes[i + 1] : 0, b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    out += c[b0 >> 2] + c[((b0 & 3) << 4) | (b1 >> 4)];
+    out += i + 1 < bytes.length ? c[((b1 & 15) << 2) | (b2 >> 6)] : '=';
+    out += i + 2 < bytes.length ? c[b2 & 63] : '=';
+  }
+  return out;
+}
 
 /* --------------------------------------------- SvelteKit __data.json decoder */
 function devalueDecode(flat) {
@@ -186,7 +197,13 @@ async function resolveEmbed(dataLink) {
   const pt = aesCbcDecrypt(base64ToUint8(ct_b64), aesKey, base64ToUint8(iv_b64));
   const url = bytesToStr(pt).trim();
   if (!/^https?:\/\//.test(url)) throw new Error('decrypt produced non-URL');
-  return { url, subs };
+  // playlistKey (__pk): base64 of the WASM _c() output — the site's playlist-scramble key.
+  // Shirox's proxy XOR-unscrambles every non-#EXTM3U playlist (master/audio/video) with it.
+  const ex = inst.exports;
+  if (ex.memory.buffer.byteLength < 4096) ex.memory.grow(1);
+  const pkPtr = ex._c();
+  const pk = uint8ToBase64(new Uint8Array(ex.memory.buffer).slice(pkPtr, pkPtr + 32));
+  return { url, subs, pk };
 }
 
 /* -------------------------------------------------------------- module API */
@@ -263,7 +280,8 @@ async function extractStreamUrl(url) {
         streams.push({
           title: String(sv.dataType || '').toUpperCase() + ' • ' + sv.serverName,
           streamUrl: r.url,
-          headers: { Referer: 'https://flixcloud.cc/', Origin: 'https://flixcloud.cc', 'User-Agent': UA }
+          headers: { Referer: 'https://flixcloud.cc/', Origin: 'https://flixcloud.cc', 'User-Agent': UA },
+          playlistKey: r.pk
         });
         for (const s of (r.subs || [])) { if (!seenSub.has(s.url)) { seenSub.add(s.url); allSubs.push(s); } }
       }
