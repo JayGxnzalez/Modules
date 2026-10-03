@@ -268,17 +268,19 @@ async function extractStreamUrl(url) {
     const servers = (flix && flix.servers) || [];
     if (!servers.length) { log('no servers'); return JSON.stringify({ streams: [] }); }
 
-    const cache = {}, streams = [], allSubs = [], seenSub = new Set();
+    // Each embed carries both audio tracks (jpn=sub default, eng=dub) in one master,
+    // so HD-1 sub/dub share an identical dataLink. Dedupe by embed → one entry per
+    // server (HD-1, HD-2); the dub is selectable as the English audio track in-player.
+    const seenLink = new Set(), streams = [], allSubs = [], seenSub = new Set();
     for (const sv of servers) {
-      const link = sv.dataLink; if (!link) continue;
-      if (!(link in cache)) {
-        try { cache[link] = await resolveEmbed(link); }
-        catch (e) { cache[link] = null; log('embed ' + sv.serverName + ' ' + sv.dataType + ' failed: ' + e.message); }
-      }
-      const r = cache[link];
+      const link = sv.dataLink; if (!link || seenLink.has(link)) continue;
+      seenLink.add(link);
+      let r = null;
+      try { r = await resolveEmbed(link); }
+      catch (e) { log('embed ' + sv.serverName + ' failed: ' + e.message); }
       if (r && r.url) {
         streams.push({
-          title: String(sv.dataType || '').toUpperCase() + ' • ' + sv.serverName,
+          title: sv.serverName,
           streamUrl: r.url,
           headers: { Referer: 'https://flixcloud.cc/', Origin: 'https://flixcloud.cc', 'User-Agent': UA },
           playlistKey: r.pk
