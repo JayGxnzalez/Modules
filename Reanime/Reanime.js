@@ -173,7 +173,10 @@ function runWasmR(inst, inB, k1, k2, seedInt) {
   return mem.slice(z, z + L);
 }
 async function resolveEmbed(dataLink) {
-  const res = await soraFetch(dataLink, { headers: { Referer: BASE_URL + '/' }, impersonate: 'chrome' });
+  // flixcloud.cc is Cloudflare-gated per-subdomain; use the real WebView engine so the
+  // app's CFBypass cf_clearance applies (header-only impersonate rides on warm clearance
+  // and returns an empty 403 body when it has expired -> "empty embed").
+  const res = await soraFetch(dataLink, { headers: { Referer: BASE_URL + '/' }, impersonate: 'webview' });
   const html = res && typeof res.text === 'function' ? await res.text() : '';
   if (!html) throw new Error('empty embed');
   const seed = grab(html, 'obfuscation_seed'), wpay = grab(html, 'w_payload');
@@ -183,7 +186,7 @@ async function resolveEmbed(dataLink) {
   if (!frag1 || !iv_b64 || !frag2 || !T) throw new Error('missing obfuscated fields');
   const subs = parseSubs(html);
 
-  const api = await fetchJson('https://flixcloud.cc/api/m3u8/' + T, { headers: { Referer: dataLink }, impersonate: 'chrome' });
+  const api = await fetchJson('https://flixcloud.cc/api/m3u8/' + T, { headers: { Referer: dataLink }, impersonate: 'webview' });
   if (!api) throw new Error('api/m3u8 fetch failed');
   const vidField = sha256hex(T + 'vid').substring(0, 10), keyField = sha256hex(T + 'key').substring(0, 10);
   const ct_b64 = api[vidField], frag3 = api[keyField];
