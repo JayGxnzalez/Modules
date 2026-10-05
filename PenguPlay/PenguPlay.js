@@ -636,7 +636,18 @@ async function extractStreamUrl(url) {
         _rank: ri.rank,
         _play: ci.play,
         _size: bh.videoSize || 0,
-        title: title, name: title, quality: ri.label || title,
+        title: title, name: title,
+        // DIAGNOSTIC: Shirox ignores the array order and re-sorts the picker
+        // lexically ASCENDING by the resolution label, which is why "4K" lands
+        // between "480p" and "720p" ('8' < 'K', '4' < '7') and 1080p leads.
+        // `quality` is a sort key here, not displayed in the Shirox row, so it
+        // carries an inverted zero-padded rank: smaller string = better
+        // quality, which an ascending sort then puts on top.
+        //   4K(2160)->"7839"  1080->"8919"  720->"9279"  480->"9519"
+        // Unknown rank 0 -> "9999", so it sorts last.
+        // If the order still comes out wrong, the app is sorting on `title`
+        // instead and this needs to move into the title text.
+        quality: String(9999 - (ri.rank || 0)),
         streamUrl: s.url, url: s.url,
         // VAPlayer/MovieBox 403 without these; forward them verbatim.
         headers: (bh.proxyHeaders && bh.proxyHeaders.request) || {}
