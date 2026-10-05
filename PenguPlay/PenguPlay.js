@@ -13,6 +13,12 @@
 // JavaScriptCore constraints honored: no setTimeout, no new URL(), no crypto.subtle.
 // All four outputs are JSON.stringify'd (Shirox video-module requirement).
 
+// Bump on every push. Logged on each stream resolve so the device can confirm
+// WHICH build is running — scriptUrl is fetched from raw.githubusercontent.com,
+// which serves stale CDN cache, so "the change did nothing" and "the change
+// never loaded" otherwise look identical.
+const MODULE_VERSION = "v6-sorttest";
+
 // ---- USER CONFIG ----------------------------------------------------------
 const AUTH_TOKEN = "SCLz87P2nS1zZo1bUrt_thOZFcq6ERJr5L00glctYmQ";  // required, no streams without it
 const SERVER_FILTERS = {};  // PenguPlay-side filters, e.g. { res_360: "unchecked" }
@@ -637,16 +643,12 @@ async function extractStreamUrl(url) {
         _play: ci.play,
         _size: bh.videoSize || 0,
         title: title, name: title,
-        // DIAGNOSTIC: Shirox ignores the array order and re-sorts the picker
-        // lexically ASCENDING by the resolution label, which is why "4K" lands
-        // between "480p" and "720p" ('8' < 'K', '4' < '7') and 1080p leads.
-        // `quality` is a sort key here, not displayed in the Shirox row, so it
-        // carries an inverted zero-padded rank: smaller string = better
-        // quality, which an ascending sort then puts on top.
-        //   4K(2160)->"7839"  1080->"8919"  720->"9279"  480->"9519"
-        // Unknown rank 0 -> "9999", so it sorts last.
-        // If the order still comes out wrong, the app is sorting on `title`
-        // instead and this needs to move into the title text.
+        // SORT TEST: if the picker orders by `quality`, this inverted
+        // zero-padded rank puts the best first under an ascending sort
+        // (4K->"7839", 1080p->"8919", 720p->"9279", 480p->"9519").
+        // HydraHD puts its resolution at the END of the title and still shows
+        // 4K first, which argues the app does NOT simply sort titles — so this
+        // needs a confirmed-loaded build before its result means anything.
         quality: String(9999 - (ri.rank || 0)),
         streamUrl: s.url, url: s.url,
         // VAPlayer/MovieBox 403 without these; forward them verbatim.
@@ -692,6 +694,10 @@ async function extractStreamUrl(url) {
       const k = (s.title.match(/\[(HLS|MP4|DASH|MKV)\]/) || [, "?"])[1];
       mix[k] = (mix[k] || 0) + 1;
     });
+    console.log("[penguplay] " + MODULE_VERSION + " order=" +
+                streams.slice(0, 6).map(function (s) {
+                  return (s.title.split(" • ")[0] || "?");
+                }).join(">"));
     console.log("[penguplay] streams=" + streams.length +
                 " containers={" + Object.keys(mix).map(function (k) {
                   return k + ":" + mix[k];
