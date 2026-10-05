@@ -13,12 +13,6 @@
 // JavaScriptCore constraints honored: no setTimeout, no new URL(), no crypto.subtle.
 // All four outputs are JSON.stringify'd (Shirox video-module requirement).
 
-// Bump on every push. Logged on each stream resolve so the device can confirm
-// WHICH build is running — scriptUrl is fetched from raw.githubusercontent.com,
-// which serves stale CDN cache, so "the change did nothing" and "the change
-// never loaded" otherwise look identical.
-const MODULE_VERSION = "v6-sorttest";
-
 // ---- USER CONFIG ----------------------------------------------------------
 const AUTH_TOKEN = "SCLz87P2nS1zZo1bUrt_thOZFcq6ERJr5L00glctYmQ";  // required, no streams without it
 const SERVER_FILTERS = {};  // PenguPlay-side filters, e.g. { res_360: "unchecked" }
@@ -627,14 +621,15 @@ async function extractStreamUrl(url) {
       const ck = contentKey(s.url);
       if (seenFiles[ck]) { dupeCount++; return; }
       seenFiles[ck] = true;
-      // Container trails the row in brackets — with MKV playable it's a
-      // secondary detail (file size / quality expectation), not a warning, so
-      // resolution, provider and audio flags lead.
+      // Row format:  Source [resolution • container] <flags>
+      // e.g.          2Peckle [4K • MKV] 🇧🇷
+      //               MovieBox [1080p • HLS]
+      // The numeric sort prefix is prepended after sorting, below.
       const ai = audioInfo(s);
-      const head = [ri.label, source, ai ? ai.label : ""].filter(Boolean).join(" • ");
-      const title = (head ? head + (ci.ext ? " • [" + ci.ext + "]" : "")
-                          : (ci.ext ? "[" + ci.ext + "]" : "")) ||
-                    (s.name || "PenguPlay");
+      const specs = [ri.label, ci.ext].filter(Boolean).join(" • ");
+      let title = source || s.name || "PenguPlay";
+      if (specs) title += " [" + specs + "]";
+      if (ai && ai.label) title += " " + ai.label;
       // Dual-key emission (HydraHD convention): different Shirox/Sora/Luna
       // builds read different keys, so emit both spellings of each. Each app
       // reads the key it knows and ignores the other.
@@ -642,14 +637,7 @@ async function extractStreamUrl(url) {
         _rank: ri.rank,
         _play: ci.play,
         _size: bh.videoSize || 0,
-        title: title, name: title,
-        // SORT TEST: if the picker orders by `quality`, this inverted
-        // zero-padded rank puts the best first under an ascending sort
-        // (4K->"7839", 1080p->"8919", 720p->"9279", 480p->"9519").
-        // HydraHD puts its resolution at the END of the title and still shows
-        // 4K first, which argues the app does NOT simply sort titles — so this
-        // needs a confirmed-loaded build before its result means anything.
-        quality: String(9999 - (ri.rank || 0)),
+        title: title, name: title, quality: ri.label || title,
         streamUrl: s.url, url: s.url,
         // VAPlayer/MovieBox 403 without these; forward them verbatim.
         headers: (bh.proxyHeaders && bh.proxyHeaders.request) || {}
@@ -662,7 +650,27 @@ async function extractStreamUrl(url) {
     streams.sort(function (a, b) {
       return (b._play - a._play) || (b._rank - a._rank) || (b._size - a._size);
     });
-    streams.forEach(function (s) {
+    // The app discards this array's order and re-sorts the picker LEXICALLY
+    // ASCENDING by `title`. Proven on-device: a build logging its own emitted
+    // order printed "4K>1080p>720p>720p>720p>480p" while the picker showed 4K
+    // seventh, behind the 1080p/346p/360p/480p block — "4K" sorts between
+    // "480p" and "720p" because '8' < 'K' but '4' < '7'. A build that moved
+    // the sort key into `quality` changed nothing (and logged its own version,
+    // so it was confirmed loaded, not stale CDN cache), which ruled that field
+    // out.
+    //
+    // No readable resolution label can sort correctly under an ascending
+    // lexical sort — the best quality would need the smallest string. So each
+    // title carries its position from the sort above, zero-padded so "10"
+    // can't precede "2". The app's own sort then reproduces this order exactly,
+    // including the playability and file-size tiebreaks, not just resolution.
+    const width = Math.max(2, String(streams.length).length);
+    streams.forEach(function (s, i) {
+      const n = String(i + 1);
+      const pad = n.length >= width ? n
+                : new Array(width - n.length + 1).join("0") + n;
+      s.title = pad + ". " + s.title;
+      s.name = s.title;
       delete s._rank; delete s._play; delete s._size;
     });
 
@@ -691,13 +699,10 @@ async function extractStreamUrl(url) {
     }
     const mix = {};
     streams.forEach(function (s) {
-      const k = (s.title.match(/\[(HLS|MP4|DASH|MKV)\]/) || [, "?"])[1];
+      // Container is the last token inside the brackets: "[4K • MKV]".
+      const k = (s.title.match(/(HLS|MP4|DASH|MKV)\]/) || [, "?"])[1];
       mix[k] = (mix[k] || 0) + 1;
     });
-    console.log("[penguplay] " + MODULE_VERSION + " order=" +
-                streams.slice(0, 6).map(function (s) {
-                  return (s.title.split(" • ")[0] || "?");
-                }).join(">"));
     console.log("[penguplay] streams=" + streams.length +
                 " containers={" + Object.keys(mix).map(function (k) {
                   return k + ":" + mix[k];
