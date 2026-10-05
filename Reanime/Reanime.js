@@ -209,6 +209,37 @@ async function resolveEmbed(dataLink) {
   return { url, subs, pk };
 }
 
+/* --------------------------------------------- audio diagnostic (temporary) */
+// Logs the resolved master's audio codec + rendition structure to the Logs screen,
+// to help diagnose the app-side audio crackle/desync. Codec (AAC vs Opus) and whether
+// audio is separate renditions are in the master; SAMPLE RATE is not (segment-init only,
+// = ibro's probe). Purely diagnostic: fully guarded, never affects playback. Remove once fixed.
+async function logStreamAudioInfo(masterUrl, pkB64) {
+  try {
+    const res = await soraFetch(masterUrl, { headers: { Referer: 'https://flixcloud.cc/', Origin: 'https://flixcloud.cc' }, impersonate: 'webview' });
+    let body = res && typeof res.text === 'function' ? await res.text() : '';
+    if (!body) { log('[diag] master fetch empty'); return; }
+    if (!/^#EXTM3U/.test(body.trim()) && pkB64) {
+      try {
+        const key = base64ToUint8(pkB64), ct = base64ToUint8(body.trim()), out = new Uint8Array(ct.length);
+        for (let i = 0; i < ct.length; i++) out[i] = ct[i] ^ key[i % key.length];
+        const dec = bytesToStr(out);
+        if (/^#EXTM3U/.test(dec)) body = dec;
+      } catch (e) {}
+    }
+    if (!/^#EXTM3U/.test(body.trim())) { log('[diag] master not a playlist (scrambled/blocked)'); return; }
+    const codecs = (body.match(/CODECS="([^"]+)"/) || [])[1] || '?';
+    const reso = (body.match(/RESOLUTION=([0-9x]+)/) || [])[1] || '?';
+    const auds = body.match(/#EXT-X-MEDIA:TYPE=AUDIO[^\n\r]*/g) || [];
+    const summary = auds.map(a => {
+      const lang = (a.match(/LANGUAGE="([^"]+)"/) || [])[1] || '?';
+      const name = (a.match(/NAME="([^"]+)"/) || [])[1] || '?';
+      return lang + '/' + name + (/DEFAULT=YES/.test(a) ? '*' : '');
+    }).join(',');
+    log('[diag] codecs=' + codecs + ' res=' + reso + ' audioRenditions=' + auds.length + ' [' + summary + ']');
+  } catch (e) { log('[diag] audio-info error: ' + e.message); }
+}
+
 /* -------------------------------------------------------------- module API */
 async function searchResults(keyword) {
   try {
@@ -291,6 +322,7 @@ async function extractStreamUrl(url) {
         for (const s of (r.subs || [])) { if (!seenSub.has(s.url)) { seenSub.add(s.url); allSubs.push(s); } }
       }
     }
+    if (streams.length) { await logStreamAudioInfo(streams[0].streamUrl, streams[0].playlistKey); }
     log('streams=' + streams.length + ' subs=' + allSubs.length);
     const out = { streams };
     if (allSubs.length) out.allSubtitles = allSubs;
