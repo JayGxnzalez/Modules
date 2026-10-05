@@ -217,11 +217,15 @@ async function resolveStremioSubtitles(ppId, type) {
 // carrying multi-track audio (the dual-audio "[Hindi DDP 2.0 + English DTS-HD
 // MA 5.1]" files) — so the multi-flag labels finally have something to label.
 //
-// DASH (.mpd) is still treated as unplayable: the MKV player is a Matroska
-// demuxer, not a DASH client, and nothing has been tested to say otherwise.
-// Flip DASH_PLAYABLE if MovieBox's .mpd streams turn out to work.
+// DASH (.mpd) is enabled too, now that the app handles it. Nearly all of
+// PenguPlay's DASH comes from MovieBox, and those manifests only load with the
+// CloudFront cookie + Referer + User-Agent in behaviorHints.proxyHeaders —
+// which the module already forwards verbatim. If .mpd rows return
+// "resource unavailable" rather than "Cannot Open", suspect those headers
+// (or an expired CloudFront policy) rather than container support, and set
+// DASH_PLAYABLE back to false to hide them.
 const PLAY_YES = 2, PLAY_MAYBE = 1, PLAY_NO = 0;
-const DASH_PLAYABLE = false;
+const DASH_PLAYABLE = true;
 
 function containerInfo(s) {
   const url = String(s.url || "");
