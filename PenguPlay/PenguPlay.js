@@ -217,15 +217,23 @@ async function resolveStremioSubtitles(ppId, type) {
 // carrying multi-track audio (the dual-audio "[Hindi DDP 2.0 + English DTS-HD
 // MA 5.1]" files) — so the multi-flag labels finally have something to label.
 //
-// DASH (.mpd) is enabled too, now that the app handles it. Nearly all of
-// PenguPlay's DASH comes from MovieBox, and those manifests only load with the
-// CloudFront cookie + Referer + User-Agent in behaviorHints.proxyHeaders —
-// which the module already forwards verbatim. If .mpd rows return
-// "resource unavailable" rather than "Cannot Open", suspect those headers
-// (or an expired CloudFront policy) rather than container support, and set
-// DASH_PLAYABLE back to false to hide them.
+// DASH (.mpd) stays OFF — tested on-device and it fails at the segment layer,
+// which no module change can reach:
+//   HLSQuality: Not a playlist (status=200) ... index_web.mpd   <- manifest OK
+//   Player: Item failed: Cannot Open                            <- AVPlayer: no DASH
+//   -> falls back to mpv, which does have a dash demuxer:
+//   MPV [ffmpeg] http: HTTP error 400 bad request
+//   MPV [ffmpeg/demuxer] dash: Failed to open an initialization section
+//   MPV [ffmpeg/demuxer] dash: Error when loading first fragment of playlist
+// The MANIFEST fetches fine (200) with the forwarded CloudFront cookie, then
+// every SEGMENT request 400s. MovieBox signs the manifest URL with a
+// ?Policy/&Signature/&Key-Pair-Id query string, and ffmpeg's dash demuxer
+// builds segment URLs from it without carrying that signing query (and
+// without the proxyHeaders) — so the segments are unsigned/malformed.
+// The module hands over the right URL and the right headers; what the demuxer
+// does next is app-side. Re-test if the app gains a real DASH client.
 const PLAY_YES = 2, PLAY_MAYBE = 1, PLAY_NO = 0;
-const DASH_PLAYABLE = true;
+const DASH_PLAYABLE = false;
 
 function containerInfo(s) {
   const url = String(s.url || "");
