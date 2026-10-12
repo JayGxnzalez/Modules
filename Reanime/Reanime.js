@@ -288,7 +288,14 @@ async function extractStreamUrl(url) {
           headers: { Referer: 'https://flixcloud.cc/', Origin: 'https://flixcloud.cc', 'User-Agent': UA },
           playlistKey: r.pk
         });
-        for (const s of (r.subs || [])) { if (!seenSub.has(s.url)) { seenSub.add(s.url); allSubs.push(s); } }
+        // Dedupe on host-stripped path, not full URL: HD-1 and HD-2 serve the SAME
+        // subtitle file from different CDN hosts (rundowncdn vs cobaltcdn) at the same
+        // path, so a full-URL check misses them. Path = true-duplicate identity;
+        // genuinely different tracks (_eng_3 vs _eng_4 ...) keep distinct paths.
+        for (const s of (r.subs || [])) {
+          const key = String(s.url || '').replace(/^https?:\/\/[^/]+/i, '').split(/[?#]/)[0];
+          if (key && !seenSub.has(key)) { seenSub.add(key); allSubs.push(s); }
+        }
       }
     }
     log('streams=' + streams.length + ' subs=' + allSubs.length);
