@@ -1,12 +1,21 @@
-async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
-    const headers = options.headers || {};
+// Pass options.impersonate ('webview' | 'chrome') through to Paul's browser-engine
+// fetchv2 commit. 'webview' routes the request through the app's real WebView, so
+// the CFBypass-solved cf_clearance applies and Cloudflare managed challenges pass.
+async function soraFetch(url, options = {}) {
+    const opts = options || {};
+    const headers = opts.headers || {};
+    const imp = opts.impersonate;
     try {
-        return await fetchv2(url, headers, options.method || 'GET', options.body || null);
+        return await fetchv2(url, headers, opts.method || 'GET', opts.body || null, imp ? { impersonate: imp } : {});
     } catch (e) {
         try {
-            return await fetch(url, options);
-        } catch (error) {
-            return null;
+            return await fetchv2(url, { method: opts.method || 'GET', headers: headers, body: opts.body || null, impersonate: imp });
+        } catch (e2) {
+            try {
+                return await fetch(url, { method: opts.method || 'GET', headers: headers, body: opts.body || null });
+            } catch (error) {
+                return null;
+            }
         }
     }
 }
@@ -20,11 +29,10 @@ function noCache(url) {
     return url + sep + "_ts=" + Date.now().toString(36) + (++__cbSeq).toString(36);
 }
 
-/* mangadot put a Cloudflare managed challenge on its /api/ routes. In a browser
- * those calls carry same-origin Referer/Origin + an XHR marker; the app's bare
- * fetch does not, which is what the WAF rule flags. Send them so the request
- * looks like the site's own react-query call. (No User-Agent — that must stay
- * whatever earned the cf_clearance token, or CF re-challenges.) */
+/* mangadot escalated its /api/ and /uploads/ routes to a Cloudflare MANAGED
+ * challenge — headers alone no longer pass it. These calls go through
+ * impersonate:'webview' (below) so the app's CFBypass clearance clears them;
+ * the same-origin headers still ride along to match the site's own call. */
 const API_HEADERS = {
     "Referer": "https://mangadot.net/",
     "Origin": "https://mangadot.net",
@@ -220,9 +228,9 @@ async function extractChapters(url) {
         const id = extractMangaId(url);
         if (!id) return { en: [] };
 
-        // /api/ is behind a Cloudflare managed challenge — send browser-like
-        // headers so the request matches the site's own call. No _ts here.
-        const response = await soraFetch("https://mangadot.net/api/manga/" + id + "/chapters/list?lang=en", { headers: API_HEADERS });
+        // /api/ is behind a Cloudflare managed challenge — go through the WebView
+        // engine so the app's CFBypass clearance clears it. No _ts here.
+        const response = await soraFetch("https://mangadot.net/api/manga/" + id + "/chapters/list?lang=en", { headers: API_HEADERS, impersonate: "webview" });
         if (!response) return { en: [] };
 
         const list = JSON.parse(await response.text());
@@ -300,8 +308,9 @@ async function extractImages(url) {
         const chId = extractChapterId(url);
         if (!chId) return results;
 
-        // /api/ behind Cloudflare — send browser-like headers (see extractChapters)
-        const response = await soraFetch("https://mangadot.net/api/uploads/" + chId + "/images", { headers: API_HEADERS });
+        // /api/ behind Cloudflare managed challenge — WebView engine (see extractChapters).
+        // This also warms the cf_clearance that the native image loads then ride on.
+        const response = await soraFetch("https://mangadot.net/api/uploads/" + chId + "/images", { headers: API_HEADERS, impersonate: "webview" });
         if (!response) return results;
 
         const json = JSON.parse(await response.text());
