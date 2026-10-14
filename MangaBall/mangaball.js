@@ -13,6 +13,9 @@ const FILTER_ADULT = true;
 /* Show the English title where the API carries one, instead of romaji. */
 const PREFER_ENGLISH_TITLES = true;
 
+/* MangaDex cover thumbnail width: 256 (fastest) or 512 (sharper). */
+const COVER_THUMB_SIZE = 512;
+
 /* Languages to pull chapters for. One code = one request and a small
  * payload; add more codes (e.g. ["en", "es"]) for extra reader tabs, or
  * set to [] to pull every language MangaBall has (slow on big series). */
@@ -113,13 +116,23 @@ function objectId(url) {
     return m ? m[1] : null;
 }
 
+/* MangaDex serves resized covers by appending .256.jpg / .512.jpg to the
+ * whole filename. The originals are multi-megabyte scans, so a grid of 36
+ * of them is what makes search feel slow. */
+function thumbify(u) {
+    if (!u) return u;
+    if (u.indexOf("uploads.mangadex.org/covers/") === -1) return u;
+    if (/\.(?:256|512)\.jpg$/i.test(u)) return u;
+    return u + "." + COVER_THUMB_SIZE + ".jpg";
+}
+
 /* MangaBall's own cover host is Cloudflare hotlink-protected and 403s the
  * app's image loader, so the mirrored sources are tried first and the
  * MangaBall CDN is only a last resort. */
 function coverUrl(item) {
     const img = item && item.image ? item.image : null;
     if (!img) return "";
-    if (img.cdn_mangadex) return httpsify(img.cdn_mangadex);
+    if (img.cdn_mangadex) return thumbify(httpsify(img.cdn_mangadex));
     if (img.cdn_mangaupdate) return httpsify(img.cdn_mangaupdate);
     if (img.file) return httpsify(img.file);
     if (img.cover && img.cover.path) {
