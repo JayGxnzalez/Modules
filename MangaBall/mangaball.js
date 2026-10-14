@@ -7,6 +7,12 @@ const SITE = "https://mangaball.com";
 const API = "https://api.mangaball.com/api/v1";
 const COVER_CDN = "https://bulbasaur.poke-black-and-white.net/covers/";
 
+/* Hide adult / hentai titles from search results. */
+const FILTER_ADULT = true;
+
+/* Show the English title where the API carries one, instead of romaji. */
+const PREFER_ENGLISH_TITLES = true;
+
 const CHAPTER_LIMIT = 500;
 const MAX_CHAPTER_PAGES = 8;
 
@@ -101,16 +107,98 @@ function objectId(url) {
     return m ? m[1] : null;
 }
 
+/* MangaBall's own cover host is Cloudflare hotlink-protected and 403s the
+ * app's image loader, so the mirrored sources are tried first and the
+ * MangaBall CDN is only a last resort. */
 function coverUrl(item) {
     const img = item && item.image ? item.image : null;
     if (!img) return "";
+    if (img.cdn_mangadex) return httpsify(img.cdn_mangadex);
+    if (img.cdn_mangaupdate) return httpsify(img.cdn_mangaupdate);
+    if (img.file) return httpsify(img.file);
     if (img.cover && img.cover.path) {
         const p = String(img.cover.path).replace(/\\/g, "/").replace(/^\/+/, "");
         return COVER_CDN + p;
     }
-    if (img.cdn_mangadex) return httpsify(img.cdn_mangadex);
-    if (img.file) return httpsify(img.file);
     return "";
+}
+
+/* ------------------------------------------------------------------ */
+/* adult filtering                                                     */
+/* ------------------------------------------------------------------ */
+
+const ADULT_TAGS = {
+    "hentai": true,
+    "pornographic": true,
+    "smut": true,
+    "adult": true,
+    "erotica": true
+};
+
+function isAdult(item) {
+    if (!item) return false;
+    if (item.is18plus === true) return true;
+
+    /* MangaBall prefixes adult uploads with "[H]" */
+    const name = String(item.name || "");
+    if (/^\s*[\[(（【]\s*h\s*[\])）】]/i.test(name)) return true;
+
+    if (Array.isArray(item.tags)) {
+        for (let i = 0; i < item.tags.length; i++) {
+            const t = item.tags[i];
+            if (!t) continue;
+            const tn = String(typeof t === "string" ? t : t.name || "").toLowerCase().trim();
+            if (ADULT_TAGS[tn]) return true;
+        }
+    }
+    return false;
+}
+
+/* ------------------------------------------------------------------ */
+/* English titles                                                      */
+/* ------------------------------------------------------------------ */
+
+/* CJK, Hangul, Cyrillic, Arabic, Thai, fullwidth */
+const NON_LATIN = /[Ѐ-ӿ؀-ۿ฀-๿　-ヿ㐀-䶿一-鿿가-힯＀-￯]/;
+
+const ENGLISH_HINT = /\b(the|of|and|an|in|on|to|with|who|that|my|is|are|was|from|for|at|by|his|her|its|their|this|but|not|all|you|we|it|be|has|have|how|what|when|where|why|after|before|end|world|story|life|love|become|beyond|journey|funeral|family|king|queen|girl|boy|man|woman|day|night|god|hero|magic|school|adventures?)\b/i;
+
+/* Romanised Japanese reads as Latin script but is not an English title. */
+const ROMAJI_HINT = /(^|\s)(no|wo|ga|ni|wa|ka|mo|yo|na|da|desu|shite|suru|kara|made|tachi|san|kun|chan|sama)(\s|$)/i;
+
+function normalizeTitle(s) {
+    return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function englishTitle(item) {
+    const name = String(item && item.name ? item.name : "").trim();
+    if (!PREFER_ENGLISH_TITLES) return name;
+
+    const alts = Array.isArray(item.alternateName) ? item.alternateName : [];
+    if (alts.length === 0) return name;
+
+    const baseline = normalizeTitle(name);
+    let best = null;
+    let bestScore = -999;
+
+    for (let i = 0; i < alts.length; i++) {
+        const a = String(alts[i] || "").trim();
+        if (!a || a === "-" || a.length < 2) continue;
+        if (NON_LATIN.test(a)) continue;
+        if (normalizeTitle(a) === baseline) continue;
+
+        let score = 0;
+        if (ENGLISH_HINT.test(a)) score += 2;
+        if (ROMAJI_HINT.test(a)) score -= 3;
+        /* earlier entries are the more canonical ones */
+        score -= i * 0.01;
+
+        if (score > bestScore) { bestScore = score; best = a; }
+    }
+
+    /* only swap when the alternate actually looks like English */
+    if (best && bestScore > 0) return best;
+    return name;
 }
 
 function siteLabel(site) {
@@ -189,11 +277,14 @@ function displayTitle(number, realTitle) {
 async function searchResults(keyword, page = 1) {
     const results = [];
     try {
+        /* adult_mode=no_18 does NOT filter adult titles — it only forces
+         * every is18plus flag to false, which destroys the one signal
+         * worth having. Ask for the honest data and filter it here. */
         const url = API + "/title/search-advanced"
             + "?keyword=" + encodeURIComponent(keyword)
             + "&sort_by=lastupdate&sort_order=desc"
-            + "&adult_mode=no_18&tag_mode=AND&use_user_settings=false"
-            + "&page=" + (page || 1) + "&limit=24";
+            + "&tag_mode=AND&use_user_settings=false"
+            + "&page=" + (page || 1) + "&limit=36";
 
         const response = await soraFetch(url, { method: "GET" });
         if (!response) return results;
@@ -206,10 +297,11 @@ async function searchResults(keyword, page = 1) {
             if (!item) continue;
             const id = item.id || item._id;
             if (!id || !item.name) continue;
+            if (FILTER_ADULT && isAdult(item)) continue;
             results.push({
                 id: SITE + "/title-detail/" + String(id),
                 imageURL: coverUrl(item),
-                title: String(item.name).trim()
+                title: englishTitle(item)
             });
         }
         return results;
