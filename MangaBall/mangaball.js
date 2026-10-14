@@ -13,8 +13,14 @@ const FILTER_ADULT = true;
 /* Show the English title where the API carries one, instead of romaji. */
 const PREFER_ENGLISH_TITLES = true;
 
+/* Languages to pull chapters for. One code = one request and a small
+ * payload; add more codes (e.g. ["en", "es"]) for extra reader tabs, or
+ * set to [] to pull every language MangaBall has (slow on big series). */
+const CHAPTER_LANGUAGES = ["en"];
+
 const CHAPTER_LIMIT = 500;
-const MAX_CHAPTER_PAGES = 8;
+const MAX_CHAPTER_PAGES = 4;
+const MAX_VARIANTS_PER_CHAPTER = 10;
 
 /* Upstream source quality. MangaBall mirrors other sites and labels each
  * upload with a Pokemon "group" name, but the real quality signal is the
@@ -367,32 +373,43 @@ async function extractChapters(url) {
         const titleId = objectId(url);
         if (!titleId) return { en: [] };
 
-        /* 1. pull every upload, all languages */
+        /* 1. pull uploads, one request per configured language. Asking for
+         * every language at once drags in thousands of rows (Frieren alone
+         * is 2258 across 10 languages) and the reader stalls on it. */
+        const wanted = (CHAPTER_LANGUAGES && CHAPTER_LANGUAGES.length > 0)
+            ? CHAPTER_LANGUAGES : [""];
         const raw = [];
-        let page = 1;
-        let totalPages = 1;
 
-        while (page <= totalPages && page <= MAX_CHAPTER_PAGES) {
-            const listUrl = API + "/title/chapter-listing"
-                + "?title_id=" + titleId
-                + "&page=" + page
-                + "&limit=" + CHAPTER_LIMIT
-                + "&sort_order=desc&language=&search=&user_id=";
+        for (let w = 0; w < wanted.length; w++) {
+            const code = wanted[w];
+            let page = 1;
+            let totalPages = 1;
 
-            const response = await soraFetch(listUrl, { method: "GET" });
-            if (!response) break;
+            while (page <= totalPages && page <= MAX_CHAPTER_PAGES) {
+                let listUrl = API + "/title/chapter-listing"
+                    + "?title_id=" + titleId
+                    + "&page=" + page
+                    + "&limit=" + CHAPTER_LIMIT
+                    + "&sort_order=desc";
+                if (code) listUrl += "&lang=" + encodeURIComponent(code);
 
-            const json = await response.json();
-            const data = json && Array.isArray(json.data) ? json.data : [];
-            for (let i = 0; i < data.length; i++) raw.push(data[i]);
+                const response = await soraFetch(listUrl, { method: "GET" });
+                if (!response) break;
 
-            if (json && json.pagination && json.pagination.total_pages) {
-                totalPages = parseInt(json.pagination.total_pages, 10) || 1;
+                let json = null;
+                try { json = await response.json(); } catch (e) { json = null; }
+                const data = json && Array.isArray(json.data) ? json.data : [];
+                for (let i = 0; i < data.length; i++) raw.push(data[i]);
+
+                if (json && json.pagination && json.pagination.total_pages) {
+                    totalPages = parseInt(json.pagination.total_pages, 10) || 1;
+                }
+                if (data.length === 0) break;
+                page++;
             }
-            if (data.length === 0) break;
-            page++;
         }
 
+        console.log("extractChapters uploads: " + raw.length);
         if (raw.length === 0) return { en: [] };
 
         /* 2. bucket by language, then by chapter number */
@@ -462,7 +479,8 @@ async function extractChapters(url) {
 
                 const label = displayTitle(numKey, chapterTitle);
                 const variants = [];
-                for (let k = 0; k < entries.length; k++) {
+                const cap = Math.min(entries.length, MAX_VARIANTS_PER_CHAPTER);
+                for (let k = 0; k < cap; k++) {
                     const e = entries[k];
                     variants.push({
                         id: SITE + "/chapter-detail/" + e.chapterId + "?chapter=" + e.number,
@@ -479,6 +497,7 @@ async function extractChapters(url) {
             out[lang] = chapterList;
         }
 
+        if (langs.length === 0) return { en: [] };
         return out;
     } catch (err) {
         console.log("extractChapters error: " + err);
