@@ -530,9 +530,17 @@ async function fetchServerStreams(server, tmdbId, mediaType, tvSlug, session) {
         const streamUrl = streamData && streamData.success && streamData.data && streamData.data.stream_url;
         if (!streamUrl || String(streamUrl).indexOf("playback-unavailable") !== -1) return [];
 
+        // One row per source: hand the app the adaptive MASTER so it picks the
+        // quality by bandwidth, instead of exploding into a fixed-res row per
+        // variant. Mark it [2160p] only when the source actually carries 4K;
+        // otherwise it's [Auto].
         const variants = await parseMasterPlaylist(streamUrl, server);
-        if (variants && variants.length) return variants;
-        return [buildStream(streamUrl, server, resLabelFromUrl(streamUrl) || "Auto", true)];
+        if (variants && variants.length) {
+            const has4k = variants.some(function (v) { return getQualityRank(v.quality) === 10; });
+            return [buildStream(streamUrl, server, has4k ? "2160p" : "Auto", true)];
+        }
+        // Non-master direct stream: 4K only if the URL says so, else Auto.
+        return [buildStream(streamUrl, server, resLabelFromUrl(streamUrl) === "2160p" ? "2160p" : "Auto", true)];
     } catch (e) {
         return [];
     }
@@ -549,12 +557,10 @@ function getQualityRank(quality) {
     return 0;
 }
 
-// Keep every quality from every source (dedup by URL), sorted best-first so
-// the picker stacks all 4K, then all 1080p, then 720p, etc. — the same source
-// can appear at several resolutions. No resolution floor: 720p/lower and
-// direct "Auto" streams still surface (older/thin titles that aren't 1080p+
-// would otherwise vanish). Shirox re-sorts the picker LEXICALLY ASCENDING by
-// title, so carry a zero-padded "NN." prefix to reproduce this order on-device.
+// One row per source (dedup by URL), sorted best-first: the 4K-capable sources
+// ([2160p]) stack at the top, then the adaptive [Auto] sources. Shirox re-sorts
+// the picker LEXICALLY ASCENDING by title, so carry a zero-padded "NN." prefix
+// to reproduce this order on-device.
 function selectStreams(streams) {
     const seenUrls = new Set();
     const candidates = streams.filter(function (stream) {
@@ -574,9 +580,7 @@ function selectStreams(streams) {
         // lexically and renders the title, not a separate `quality` badge, so
         // the label carries both the numeric sort prefix and the quality.
         const hasRes = stream.quality && stream.quality !== "Unknown" && stream.quality !== "Auto";
-        let q;
-        if (stream.adaptive) q = hasRes ? ` [Auto • ${stream.quality}]` : " [Auto]";
-        else q = hasRes ? ` [${stream.quality}]` : "";
+        const q = hasRes ? ` [${stream.quality}]` : " [Auto]";
         const m = stream.multi ? " • Multi-audio" : "";
         const label = `${pad}. ${stream.name}${q}${m}`;
         return {
