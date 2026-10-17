@@ -537,6 +537,21 @@ async function parseMasterPlaylist(playlistUrl, server) {
                 quality = "Unknown";
             }
         }
+        // Diagnostic only: log the alternate AUDIO renditions the master carries
+        // and how they're labelled. Embedded HLS audio is handed to AVPlayer via
+        // the master as-is — the module can't relabel native audio tracks — so
+        // this just shows what Mapple actually tags (language names vs bare).
+        if (server.multi || /#EXT-X-MEDIA:[^\n]*TYPE=AUDIO/i.test(content)) {
+            const audio = [];
+            lines.forEach(function (l) {
+                if (/^#EXT-X-MEDIA:/i.test(l.trim()) && /TYPE=AUDIO/i.test(l)) {
+                    const nm = (l.match(/NAME="([^"]*)"/) || [])[1];
+                    const lang = (l.match(/LANGUAGE="([^"]*)"/) || [])[1];
+                    audio.push([nm, lang].filter(Boolean).join("/") || "unlabeled");
+                }
+            });
+            console.log("[mapple] " + server.name + " audio tracks (" + audio.length + "): " + (audio.join(", ") || "none in master"));
+        }
         return streams;
     } catch (e) {
         return null;
