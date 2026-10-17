@@ -1,0 +1,20 @@
+{
+  "sourceName": "Mapple",
+  "iconUrl": "https://www.google.com/s2/favicons?sz=128&domain=mapple.fun",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.0.0",
+  "language": "Multi",
+  "streamType": "HLS",
+  "quality": "2160",
+  "baseUrl": "https://mapple.fun/",
+  "searchBaseUrl": "https://mapple.fun/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/Mapple/Mapple.js",
+  "type": "Movie/TV",
+  "downloadSupport": true,
+  "asyncJS": true,
+  "softsub": true
+}
