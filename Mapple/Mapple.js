@@ -22,11 +22,21 @@ const BASE_URL = "https://mapple.fun";
 const DSKTP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36";
 const MBILE_UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36";
 
+// Full god-source list from the site bundle (the ids are the `source` values
+// /api/encrypt takes). Order mirrors the site's default playback priority.
+// `multi` marks the multi-audio sources (site shows a "Multi-audio" badge).
 const SERVERS = [
-    { name: "Zeus", source: "mapple" },
+    { name: "Poseidon", source: "s25" },
     { name: "Prometheus", source: "s10" },
+    { name: "Zeus", source: "mapple" },
+    { name: "Athena", source: "s2", multi: true },
+    { name: "Astraeus", source: "s28" },
+    { name: "Apollo", source: "s19", multi: true },
     { name: "Persephone", source: "s12" },
-    { name: "Poseidon", source: "s25" }
+    { name: "Hera", source: "s4" },
+    { name: "Aphrodite", source: "s6" },
+    { name: "Demeter", source: "s7" },
+    { name: "Dionysus", source: "s8" }
 ];
 
 // Metadata bridge. Mapple proxies TMDB through its own backend
@@ -34,10 +44,72 @@ const SERVERS = [
 // route search/details/episodes through Mapple itself — no third-party key to
 // revoke, same host the streams come from. Paths mirror TMDB 1:1 minus the /3.
 const TMDB = `${BASE_URL}/api/tmdb`;
+const TMDB_KEY_URL = `${BASE_URL}/api/tmdb-key`;
 const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
 
-function tmdbHeaders() {
-    return { "User-Agent": MBILE_UA, Accept: "application/json", Referer: `${BASE_URL}/`, Origin: BASE_URL };
+// Mapple's /api/tmdb proxy is gated by an x-api-key the site mints at
+// /api/tmdb-key (a "<expiresAt>.<hash>" token issued server-side — not
+// computed client-side, so there's no secret to reverse). Fetch it, cache it
+// until just before it expires, and send it as x-api-key on every /api/tmdb
+// call. Refetched automatically when expired.
+// Shared session cookie jar. /api/tmdb-key (and the stream endpoints) are
+// gated by the _mapple_site cookie the site sets on first load, so bootstrap
+// it with GET / and reuse it everywhere. The cookie count is logged — if it
+// stays 0, fetchv2 isn't surfacing Set-Cookie and we move to a webview
+// transport that keeps its own jar (same fix the streams would need).
+const SESSION_JAR = createCookieJar();
+async function ensureSession() {
+    if (SESSION_JAR.count() > 0) return SESSION_JAR;
+    try {
+        const res = await httpGet(`${BASE_URL}/`, { "User-Agent": MBILE_UA, Accept: "text/html" });
+        SESSION_JAR.update(res);
+        await readText(res);
+    } catch (e) {
+        console.log("[mapple] session bootstrap error: " + e);
+    }
+    console.log("[mapple] session cookies=" + SESSION_JAR.count());
+    return SESSION_JAR;
+}
+
+let _tmdbKey = null;
+let _tmdbKeyExp = 0;
+async function ensureTmdbKey() {
+    const now = Date.now();
+    if (_tmdbKey && now < _tmdbKeyExp - 5000) return _tmdbKey;
+    const jar = await ensureSession();
+    const hdr = { "User-Agent": MBILE_UA, Accept: "application/json", Referer: `${BASE_URL}/`, Origin: BASE_URL, "Content-Type": "application/json" };
+    const cookie = jar.serialize();
+    if (cookie) hdr.Cookie = cookie;
+    try {
+        const res = await httpPost(TMDB_KEY_URL, hdr, "");
+        jar.update(res);
+        const status = res && typeof res.status === "number" ? res.status : "?";
+        const data = await readJson(res);
+        if (data && data.key) {
+            _tmdbKey = data.key;
+            const exp = Number(data.expiresAt);
+            _tmdbKeyExp = exp > now ? exp : (now + 30000);
+            console.log("[mapple] tmdb-key ok (HTTP " + status + ", cookies=" + jar.count() + ")");
+            return _tmdbKey;
+        }
+        console.log("[mapple] tmdb-key POST HTTP " + status + " (cookies=" + jar.count() + ")");
+    } catch (e) {
+        console.log("[mapple] tmdb-key error: " + e);
+    }
+    return _tmdbKey;
+}
+
+function tmdbHeaders(key) {
+    const h = { "User-Agent": MBILE_UA, Accept: "application/json", Referer: `${BASE_URL}/`, Origin: BASE_URL };
+    if (key) h["x-api-key"] = key;
+    const cookie = SESSION_JAR.serialize();
+    if (cookie) h.Cookie = cookie;
+    return h;
+}
+
+async function tmdbGet(url) {
+    const key = await ensureTmdbKey();
+    return getJSON(url, tmdbHeaders(key));
 }
 
 // OpenSubtitles via the keyless Stremio addon (xdfkenny's method). Mapple
@@ -59,12 +131,14 @@ async function httpPost(url, headers, body) {
 function statusOk(res) {
     return !res || typeof res.status !== "number" ? true : res.status < 400;
 }
+// Read the body exactly once (text) then parse — reading .json() first and
+// .text() on the fallback double-consumes the stream, which returns "" on some
+// fetchv2 builds and masks the real body.
 async function readJson(res) {
-    try { return await res.json(); }
-    catch (e) {
-        try { return JSON.parse(await res.text()); }
-        catch (e2) { return null; }
-    }
+    let raw = "";
+    try { raw = await res.text(); } catch (e) { return null; }
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
 }
 async function readText(res) {
     try { return await res.text(); } catch (e) { return ""; }
@@ -318,10 +392,7 @@ function createCookieJar() {
 
 async function createSession(tmdbId, mediaType, tvSlug, referer) {
     try {
-        const jar = createCookieJar();
-        const homeResponse = await httpGet(`${BASE_URL}/`, { "User-Agent": MBILE_UA, Accept: "text/html" });
-        jar.update(homeResponse);
-        await readText(homeResponse);
+        const jar = await ensureSession();
 
         const tokenResponse = await httpPost(`${BASE_URL}/api/request-token`, buildApiHeaders(referer, true, jar.serialize()), "");
         jar.update(tokenResponse);
@@ -378,12 +449,14 @@ function resolvePlaylistUrl(entry, playlistUrl) {
     return `${cleanUrl.slice(0, cleanUrl.lastIndexOf("/") + 1)}${entry}`;
 }
 
-function buildStream(url, serverName, quality) {
+function buildStream(url, server, quality) {
+    const name = server.name;
     return {
-        name: `Mapple • ${serverName}`,
-        title: `Mapple • ${serverName}`,
+        name: name,
+        title: name,
         url: url,
         quality: quality,
+        multi: !!server.multi,
         headers: buildPlaybackHeaders()
     };
 }
@@ -395,7 +468,7 @@ function getResolutionLabel(width, height) {
     return `${height}p`;
 }
 
-async function parseMasterPlaylist(playlistUrl, serverName) {
+async function parseMasterPlaylist(playlistUrl, server) {
     try {
         const response = await httpGet(playlistUrl, buildPlaybackHeaders());
         if (!statusOk(response)) return null;
@@ -410,7 +483,7 @@ async function parseMasterPlaylist(playlistUrl, serverName) {
                 const resolution = line.match(/RESOLUTION=(\d+)x(\d+)/);
                 quality = resolution ? getResolutionLabel(Number(resolution[1]), Number(resolution[2])) : "Unknown";
             } else if (line && line.charAt(0) !== "#") {
-                streams.push(buildStream(resolvePlaylistUrl(line, playlistUrl), serverName, quality));
+                streams.push(buildStream(resolvePlaylistUrl(line, playlistUrl), server, quality));
                 quality = "Unknown";
             }
         }
@@ -438,9 +511,9 @@ async function fetchServerStreams(server, tmdbId, mediaType, tvSlug, session) {
         const streamUrl = streamData && streamData.success && streamData.data && streamData.data.stream_url;
         if (!streamUrl || String(streamUrl).indexOf("playback-unavailable") !== -1) return [];
 
-        const variants = await parseMasterPlaylist(streamUrl, server.name);
+        const variants = await parseMasterPlaylist(streamUrl, server);
         if (variants && variants.length) return variants;
-        return [buildStream(streamUrl, server.name, "Auto")];
+        return [buildStream(streamUrl, server, "Auto")];
     } catch (e) {
         return [];
     }
@@ -477,7 +550,12 @@ function selectStreams(streams) {
     return top.map(function (stream, i) {
         const n = String(i + 1);
         const pad = n.length >= width ? n : new Array(width - n.length + 1).join("0") + n;
-        const label = `${pad}. ${stream.name}`;
+        // Fold the resolution into the row text — Shirox re-sorts the picker
+        // lexically and renders the title, not a separate `quality` badge, so
+        // the label carries both the numeric sort prefix and the quality.
+        const q = stream.quality && stream.quality !== "Unknown" ? ` [${stream.quality}]` : "";
+        const m = stream.multi ? " • Multi-audio" : "";
+        const label = `${pad}. ${stream.name}${q}${m}`;
         return {
             title: label,
             name: label,
@@ -487,6 +565,30 @@ function selectStreams(streams) {
             headers: stream.headers
         };
     });
+}
+
+// The site keeps a full source list client-side and calls /api/dead-sources to
+// learn which to hide for a given title. Mirror that so we don't waste requests
+// probing sources Mapple already knows are dead. Shape unknown, so parse
+// defensively and log the raw body once to confirm it; failure => all active.
+async function getDeadSources(tmdbId, type, tvSlug) {
+    try {
+        const url = `${BASE_URL}/api/dead-sources?mediaId=${encodeURIComponent(tmdbId)}&mediaType=${type}&tv_slug=${encodeURIComponent(tvSlug || "")}`;
+        const res = await httpGet(url, buildApiHeaders(`${BASE_URL}/`, false, SESSION_JAR.serialize()));
+        let raw = "";
+        try { raw = await res.text(); } catch (e) { }
+        console.log("[mapple] dead-sources: " + String(raw).slice(0, 160));
+        let data = null;
+        try { data = JSON.parse(raw); } catch (e) { }
+        let list = [];
+        if (Array.isArray(data)) list = data;
+        else if (data && Array.isArray(data.dead)) list = data.dead;
+        else if (data && Array.isArray(data.deadSources)) list = data.deadSources;
+        else if (data && Array.isArray(data.sources)) list = data.sources;
+        return list.filter(function (x) { return typeof x === "string"; });
+    } catch (e) {
+        return [];
+    }
 }
 
 async function getMappleStreams(tmdbId, mediaType, season, episode) {
@@ -503,7 +605,12 @@ async function getMappleStreams(tmdbId, mediaType, season, episode) {
         const session = await createSession(tmdbId, type, tvSlug, referer);
         if (!session) return [];
 
-        const results = await Promise.all(SERVERS.map(function (server) {
+        const dead = await getDeadSources(tmdbId, type, tvSlug);
+        const active = SERVERS.filter(function (s) { return dead.indexOf(s.source) === -1; });
+        console.log("[mapple] sources active=" + active.length + "/" + SERVERS.length +
+            (dead.length ? " dead=[" + dead.join(",") + "]" : ""));
+
+        const results = await Promise.all(active.map(function (server) {
             return fetchServerStreams(server, tmdbId, type, tvSlug, session);
         }));
         return selectStreams([].concat.apply([], results));
@@ -636,7 +743,7 @@ function parsePath(href) {
 
 async function getImdbId(type, id) {
     try {
-        const data = await getJSON(`${TMDB}/${type}/${id}/external_ids`, tmdbHeaders());
+        const data = await tmdbGet(`${TMDB}/${type}/${id}/external_ids`);
         return (data && data.imdb_id) || "";
     } catch (e) {
         return "";
@@ -647,7 +754,15 @@ async function getImdbId(type, id) {
 async function searchResults(keyword) {
     const out = [];
     try {
-        const data = await getJSON(`${TMDB}/search/multi?query=${encodeURIComponent(keyword)}&page=1&include_adult=false&language=en-US`, tmdbHeaders());
+        const key = await ensureTmdbKey();
+        const searchUrl = `${TMDB}/search/multi?query=${encodeURIComponent(keyword)}&page=1&include_adult=false&language=en-US`;
+        const res = await httpGet(searchUrl, tmdbHeaders(key));
+        const status = res && typeof res.status === "number" ? res.status : "?";
+        let raw = "";
+        try { raw = await res.text(); } catch (e) { }
+        console.log("[mapple] search HTTP " + status + " keylen=" + (key ? key.length : 0) + " len=" + (raw ? raw.length : 0));
+        let data = null;
+        try { data = JSON.parse(raw); } catch (e) { }
         const results = (data && data.results) || [];
         results.forEach(function (it) {
             if (!it) return;
@@ -676,7 +791,7 @@ async function extractDetails(url) {
     const details = [{ description: "", aliases: "", airdate: "" }];
     try {
         const { type, id } = parsePath(url);
-        const data = await getJSON(`${TMDB}/${type}/${id}?language=en-US`, tmdbHeaders());
+        const data = await tmdbGet(`${TMDB}/${type}/${id}?language=en-US`);
         if (data) {
             details[0].description = data.overview || "";
             details[0].aliases = (data.genres || []).map(function (g) { return g.name; }).filter(Boolean).join(", ");
@@ -696,13 +811,13 @@ async function extractEpisodes(url) {
         if (type === "movie") {
             eps.push({ href: url, number: 1 });
         } else {
-            const data = await getJSON(`${TMDB}/tv/${id}?language=en-US`, tmdbHeaders());
+            const data = await tmdbGet(`${TMDB}/tv/${id}?language=en-US`);
             const seasons = ((data && data.seasons) || [])
                 .filter(function (s) { return s && s.season_number > 0 && (s.episode_count == null || s.episode_count > 0); })
                 .sort(function (a, b) { return a.season_number - b.season_number; });
 
             const seasonData = await Promise.all(seasons.map(function (s) {
-                return getJSON(`${TMDB}/tv/${id}/season/${s.season_number}?language=en-US`, tmdbHeaders()).catch(function () { return null; });
+                return tmdbGet(`${TMDB}/tv/${id}/season/${s.season_number}?language=en-US`).catch(function () { return null; });
             }));
 
             // `number` is the per-season episode number (NOT a running count):
