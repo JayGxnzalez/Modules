@@ -107,9 +107,26 @@ function tmdbHeaders(key) {
     return h;
 }
 
+// Drop the cached cookie + key so the next call re-bootstraps a fresh session.
+// Mapple expires _mapple_site server-side; while the app is only backgrounded
+// (JS context alive) the stale cookie would otherwise be reused forever and
+// everything gated by it starts 401ing until a full app kill.
+function resetSession() {
+    SESSION_JAR.clear();
+    _tmdbKey = null;
+    _tmdbKeyExp = 0;
+}
+
 async function tmdbGet(url) {
-    const key = await ensureTmdbKey();
-    return getJSON(url, tmdbHeaders(key));
+    let key = await ensureTmdbKey();
+    let res = await httpGet(url, tmdbHeaders(key));
+    if (res && res.status === 401) {
+        console.log("[mapple] tmdb 401 — refreshing session");
+        resetSession();
+        key = await ensureTmdbKey();
+        res = await httpGet(url, tmdbHeaders(key));
+    }
+    return readJson(res);
 }
 
 // OpenSubtitles via the keyless Stremio addon (xdfkenny's method). Mapple
@@ -382,6 +399,7 @@ function createCookieJar() {
             });
         },
         count() { return Object.keys(cookies).length; },
+        clear() { Object.keys(cookies).forEach(function (k) { delete cookies[k]; }); },
         serialize() {
             return Object.keys(cookies).map(function (name) {
                 return `${name}=${cookies[name]}`;
@@ -390,7 +408,20 @@ function createCookieJar() {
     };
 }
 
+// Retry once with a freshly bootstrapped session: a backgrounded app keeps the
+// stale cookie, so the first playback-init can fail on an expired _mapple_site;
+// resetting and re-bootstrapping recovers it without a full app kill.
 async function createSession(tmdbId, mediaType, tvSlug, referer) {
+    let s = await createSessionOnce(tmdbId, mediaType, tvSlug, referer);
+    if (!s) {
+        console.log("[mapple] session retry with fresh cookies");
+        resetSession();
+        s = await createSessionOnce(tmdbId, mediaType, tvSlug, referer);
+    }
+    return s;
+}
+
+async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
     try {
         const jar = await ensureSession();
 
@@ -781,9 +812,15 @@ async function getImdbId(type, id) {
 async function searchResults(keyword) {
     const out = [];
     try {
-        const key = await ensureTmdbKey();
+        let key = await ensureTmdbKey();
         const searchUrl = `${TMDB}/search/multi?query=${encodeURIComponent(keyword)}&page=1&include_adult=false&language=en-US`;
-        const res = await httpGet(searchUrl, tmdbHeaders(key));
+        let res = await httpGet(searchUrl, tmdbHeaders(key));
+        if (res && res.status === 401) {
+            console.log("[mapple] search 401 — refreshing session");
+            resetSession();
+            key = await ensureTmdbKey();
+            res = await httpGet(searchUrl, tmdbHeaders(key));
+        }
         const status = res && typeof res.status === "number" ? res.status : "?";
         let raw = "";
         try { raw = await res.text(); } catch (e) { }
