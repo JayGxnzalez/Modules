@@ -449,7 +449,7 @@ function resolvePlaylistUrl(entry, playlistUrl) {
     return `${cleanUrl.slice(0, cleanUrl.lastIndexOf("/") + 1)}${entry}`;
 }
 
-function buildStream(url, server, quality) {
+function buildStream(url, server, quality, adaptive) {
     const name = server.name;
     return {
         name: name,
@@ -457,8 +457,27 @@ function buildStream(url, server, quality) {
         url: url,
         quality: quality,
         multi: !!server.multi,
+        adaptive: !!adaptive,
         headers: buildPlaybackHeaders()
     };
+}
+
+// A direct (non-master) stream carries no RESOLUTION tag, but its URL usually
+// encodes the height (…-s2160p-…, …1080.m3u8, …/720/…). Read it from the path
+// so an "Auto" row can honestly show its ceiling. Returns "" when none found.
+function resLabelFromUrl(url) {
+    const s = String(url || "").split("?")[0];
+    let m = s.match(/(\d{3,4})\s*[pP](?![a-z0-9])/);
+    if (!m) m = s.match(/(\d{3,4})x(\d{3,4})/);
+    if (!m) m = s.match(/\b(2160|1440|1080|720|480|360)\b/);
+    if (!m) return "";
+    const h = Number(m[2] || m[1]);
+    if (h >= 2000) return "2160p";
+    if (h >= 1400) return "1440p";
+    if (h >= 1000) return "1080p";
+    if (h >= 700) return "720p";
+    if (h >= 400) return "480p";
+    return `${h}p`;
 }
 
 function getResolutionLabel(width, height) {
@@ -513,7 +532,7 @@ async function fetchServerStreams(server, tmdbId, mediaType, tvSlug, session) {
 
         const variants = await parseMasterPlaylist(streamUrl, server);
         if (variants && variants.length) return variants;
-        return [buildStream(streamUrl, server, "Auto")];
+        return [buildStream(streamUrl, server, resLabelFromUrl(streamUrl) || "Auto", true)];
     } catch (e) {
         return [];
     }
@@ -530,22 +549,23 @@ function getQualityRank(quality) {
     return 0;
 }
 
-// Keep Mapple's original selection (4K + 1080p only — matches the Nuvio
-// screenshots), but drop its zero-width-char sort hack. Shirox re-sorts the
-// picker LEXICALLY ASCENDING by title, so carry a zero-padded "NN." prefix
-// (PenguPlay's proven approach) to reproduce the quality order on-device.
+// Keep every quality from every source (dedup by URL), sorted best-first so
+// the picker stacks all 4K, then all 1080p, then 720p, etc. — the same source
+// can appear at several resolutions. No resolution floor: 720p/lower and
+// direct "Auto" streams still surface (older/thin titles that aren't 1080p+
+// would otherwise vanish). Shirox re-sorts the picker LEXICALLY ASCENDING by
+// title, so carry a zero-padded "NN." prefix to reproduce this order on-device.
 function selectStreams(streams) {
     const seenUrls = new Set();
     const candidates = streams.filter(function (stream) {
         if (!stream || !stream.url || seenUrls.has(stream.url)) return false;
         seenUrls.add(stream.url);
-        const rank = getQualityRank(stream.quality);
-        return rank === 10 || rank === 6;
+        return true;
     });
     candidates.sort(function (a, b) {
         return getQualityRank(b.quality) - getQualityRank(a.quality);
     });
-    const top = candidates.slice(0, 20);
+    const top = candidates.slice(0, 30);
     const width = Math.max(2, String(top.length).length);
     return top.map(function (stream, i) {
         const n = String(i + 1);
@@ -553,7 +573,10 @@ function selectStreams(streams) {
         // Fold the resolution into the row text — Shirox re-sorts the picker
         // lexically and renders the title, not a separate `quality` badge, so
         // the label carries both the numeric sort prefix and the quality.
-        const q = stream.quality && stream.quality !== "Unknown" ? ` [${stream.quality}]` : "";
+        const hasRes = stream.quality && stream.quality !== "Unknown" && stream.quality !== "Auto";
+        let q;
+        if (stream.adaptive) q = hasRes ? ` [Auto • ${stream.quality}]` : " [Auto]";
+        else q = hasRes ? ` [${stream.quality}]` : "";
         const m = stream.multi ? " • Multi-audio" : "";
         const label = `${pad}. ${stream.name}${q}${m}`;
         return {
