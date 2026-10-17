@@ -480,14 +480,17 @@ function resolvePlaylistUrl(entry, playlistUrl) {
     return `${cleanUrl.slice(0, cleanUrl.lastIndexOf("/") + 1)}${entry}`;
 }
 
-function buildStream(url, server, quality, adaptive) {
+function buildStream(url, server, quality, adaptive, multi) {
     const name = server.name;
     return {
         name: name,
         title: name,
         url: url,
         quality: quality,
-        multi: !!server.multi,
+        // "Multi-audio" is set from the REAL master (≥2 audio renditions), not
+        // the site's static capability flag — that flag only means the source
+        // *can* carry multi-audio, which over-promised on titles with one track.
+        multi: multi === undefined ? !!server.multi : !!multi,
         adaptive: !!adaptive,
         headers: buildPlaybackHeaders()
     };
@@ -537,22 +540,23 @@ async function parseMasterPlaylist(playlistUrl, server) {
                 quality = "Unknown";
             }
         }
-        // Diagnostic only: log the alternate AUDIO renditions the master carries
-        // and how they're labelled. Embedded HLS audio is handed to AVPlayer via
-        // the master as-is — the module can't relabel native audio tracks — so
-        // this just shows what Mapple actually tags (language names vs bare).
-        if (server.multi || /#EXT-X-MEDIA:[^\n]*TYPE=AUDIO/i.test(content)) {
-            const audio = [];
-            lines.forEach(function (l) {
-                if (/^#EXT-X-MEDIA:/i.test(l.trim()) && /TYPE=AUDIO/i.test(l)) {
-                    const nm = (l.match(/NAME="([^"]*)"/) || [])[1];
-                    const lang = (l.match(/LANGUAGE="([^"]*)"/) || [])[1];
-                    audio.push([nm, lang].filter(Boolean).join("/") || "unlabeled");
-                }
-            });
+        // Count the alternate AUDIO renditions the master actually carries, so
+        // the "Multi-audio" badge reflects THIS title (≥2 selectable tracks),
+        // not the source's static capability. Embedded HLS audio is handed to
+        // AVPlayer via the master as-is — the module can't relabel the tracks —
+        // the log just shows what Mapple tags (language names vs bare).
+        const audio = [];
+        lines.forEach(function (l) {
+            if (/^#EXT-X-MEDIA:/i.test(l.trim()) && /TYPE=AUDIO/i.test(l)) {
+                const nm = (l.match(/NAME="([^"]*)"/) || [])[1];
+                const lang = (l.match(/LANGUAGE="([^"]*)"/) || [])[1];
+                audio.push([nm, lang].filter(Boolean).join("/") || "unlabeled");
+            }
+        });
+        if (server.multi || audio.length) {
             console.log("[mapple] " + server.name + " audio tracks (" + audio.length + "): " + (audio.join(", ") || "none in master"));
         }
-        return streams;
+        return { variants: streams, audioCount: audio.length };
     } catch (e) {
         return null;
     }
@@ -580,13 +584,15 @@ async function fetchServerStreams(server, tmdbId, mediaType, tvSlug, session) {
         // quality by bandwidth, instead of exploding into a fixed-res row per
         // variant. Mark it [2160p] only when the source actually carries 4K;
         // otherwise it's [Auto].
-        const variants = await parseMasterPlaylist(streamUrl, server);
-        if (variants && variants.length) {
-            const has4k = variants.some(function (v) { return getQualityRank(v.quality) === 10; });
-            return [buildStream(streamUrl, server, has4k ? "2160p" : "Auto", true)];
+        const parsed = await parseMasterPlaylist(streamUrl, server);
+        if (parsed && parsed.variants.length) {
+            const has4k = parsed.variants.some(function (v) { return getQualityRank(v.quality) === 10; });
+            const multi = parsed.audioCount >= 2;
+            return [buildStream(streamUrl, server, has4k ? "2160p" : "Auto", true, multi)];
         }
-        // Non-master direct stream: 4K only if the URL says so, else Auto.
-        return [buildStream(streamUrl, server, resLabelFromUrl(streamUrl) === "2160p" ? "2160p" : "Auto", true)];
+        // Non-master direct stream: 4K only if the URL says so, else Auto. No
+        // master to inspect, so no multi-audio claim.
+        return [buildStream(streamUrl, server, resLabelFromUrl(streamUrl) === "2160p" ? "2160p" : "Auto", true, false)];
     } catch (e) {
         return [];
     }
