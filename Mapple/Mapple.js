@@ -830,41 +830,65 @@ async function getImdbId(type, id) {
 }
 
 // ---- 1. SEARCH ------------------------------------------------------------
+// TMDB paginates ~20 results/page; pull several pages and merge so the list
+// isn't capped at 20. Kept in relevance order, deduped by type+id.
+const SEARCH_PAGES = 3;
+
+async function fetchSearchPage(keyword, page, key) {
+    const url = `${TMDB}/search/multi?query=${encodeURIComponent(keyword)}&page=${page}&include_adult=false&language=en-US`;
+    const res = await httpGet(url, tmdbHeaders(key));
+    const status = res && typeof res.status === "number" ? res.status : 0;
+    let raw = "";
+    try { raw = await res.text(); } catch (e) { }
+    let data = null;
+    try { data = JSON.parse(raw); } catch (e) { }
+    return { status: status, data: data, rawLen: raw ? raw.length : 0 };
+}
+
 async function searchResults(keyword) {
     const out = [];
+    const seen = {};
+    const addItem = function (it) {
+        if (!it) return;
+        const type = it.media_type;
+        if (type !== "movie" && type !== "tv") return;
+        if (!it.id) return;
+        const dkey = type + ":" + it.id;
+        if (seen[dkey]) return;
+        seen[dkey] = true;
+        const name = type === "tv" ? (it.name || it.original_name) : (it.title || it.original_title);
+        if (!name) return;
+        const date = type === "tv" ? it.first_air_date : it.release_date;
+        const year = date ? String(date).slice(0, 4) : "";
+        out.push({
+            title: name + (year ? " (" + year + ")" : ""),
+            image: it.poster_path ? (TMDB_IMG + it.poster_path) : "",
+            href: `${TMDB}/${type}/${it.id}`
+        });
+    };
     try {
         let key = await ensureTmdbKey();
-        const searchUrl = `${TMDB}/search/multi?query=${encodeURIComponent(keyword)}&page=1&include_adult=false&language=en-US`;
-        let res = await httpGet(searchUrl, tmdbHeaders(key));
-        if (res && res.status === 401) {
+        // Page 1 carries the 401 self-heal (also refreshes a stale session).
+        let p1 = await fetchSearchPage(keyword, 1, key);
+        if (p1.status === 401) {
             console.log("[mapple] search 401 — refreshing session");
             resetSession();
             key = await ensureTmdbKey();
-            res = await httpGet(searchUrl, tmdbHeaders(key));
+            p1 = await fetchSearchPage(keyword, 1, key);
         }
-        const status = res && typeof res.status === "number" ? res.status : "?";
-        let raw = "";
-        try { raw = await res.text(); } catch (e) { }
-        console.log("[mapple] search HTTP " + status + " keylen=" + (key ? key.length : 0) + " len=" + (raw ? raw.length : 0));
-        let data = null;
-        try { data = JSON.parse(raw); } catch (e) { }
-        const results = (data && data.results) || [];
-        results.forEach(function (it) {
-            if (!it) return;
-            const type = it.media_type;
-            if (type !== "movie" && type !== "tv") return;
-            if (!it.id) return;
-            const name = type === "tv" ? (it.name || it.original_name) : (it.title || it.original_title);
-            if (!name) return;
-            const date = type === "tv" ? it.first_air_date : it.release_date;
-            const year = date ? String(date).slice(0, 4) : "";
-            out.push({
-                title: name + (year ? " (" + year + ")" : ""),
-                image: it.poster_path ? (TMDB_IMG + it.poster_path) : "",
-                href: `${TMDB}/${type}/${it.id}`
-            });
-        });
-        console.log("[mapple] search '" + keyword + "' -> " + out.length + " results");
+        console.log("[mapple] search HTTP " + p1.status + " keylen=" + (key ? key.length : 0) + " len=" + p1.rawLen);
+        const totalPages = (p1.data && p1.data.total_pages) || 1;
+        ((p1.data && p1.data.results) || []).forEach(addItem);
+
+        // Remaining pages in parallel, bounded by SEARCH_PAGES and what exists.
+        const more = [];
+        for (let p = 2; p <= Math.min(SEARCH_PAGES, totalPages); p++) {
+            more.push(fetchSearchPage(keyword, p, key).catch(function () { return { data: null }; }));
+        }
+        const pages = await Promise.all(more);
+        pages.forEach(function (pg) { ((pg.data && pg.data.results) || []).forEach(addItem); });
+
+        console.log("[mapple] search '" + keyword + "' -> " + out.length + " results (" + Math.min(SEARCH_PAGES, totalPages) + " pages)");
     } catch (e) {
         console.log("[mapple] search error: " + e);
     }
