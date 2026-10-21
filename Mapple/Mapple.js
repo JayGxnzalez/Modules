@@ -939,7 +939,13 @@ async function extractEpisodes(url) {
                     .filter(function (ep) { return ep && ep.episode_number != null; })
                     .sort(function (a, b) { return a.episode_number - b.episode_number; })
                     .forEach(function (ep) {
-                        eps.push({ href: url + "#" + sn + ":" + ep.episode_number, number: ep.episode_number });
+                        const entry = { href: url + "#" + sn + ":" + ep.episode_number, number: ep.episode_number };
+                        // Pass the TMDB episode title through (app's episode
+                        // struct has a `title` field; renders it if the build
+                        // supports it, ignored harmlessly otherwise).
+                        const nm = (ep.name || "").trim();
+                        if (nm && !/^episode\s*\d+$/i.test(nm)) entry.title = nm;
+                        eps.push(entry);
                     });
             });
         }
