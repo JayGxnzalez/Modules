@@ -944,7 +944,13 @@ async function extractEpisodes(url) {
                         // struct has a `title` field; renders it if the build
                         // supports it, ignored harmlessly otherwise).
                         const nm = (ep.name || "").trim();
-                        if (nm && !/^episode\s*\d+$/i.test(nm)) entry.title = nm;
+                        if (nm && !/^episode\s*\d+$/i.test(nm)) {
+                            // Emit both keys: manga rows render `title`; some
+                            // video renderers read `name`. One of them showing
+                            // tells us which the build supports (if any).
+                            entry.title = nm;
+                            entry.name = nm;
+                        }
                         eps.push(entry);
                     });
             });
