@@ -96,7 +96,6 @@ function audioTag(hayRaw) {
 }
 
 function normTitle(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
-function yearOf(s) { const m = String(s || "").match(/(19|20)\d{2}/); return m ? m[0] : ""; }
 // Debrid cache marker: Torrentio prefixes name with "[RD+]" (cached) or
 // "[RD download]" (uncached) etc. "+]" => cached and instant.
 function cacheInfo(name) {
@@ -265,19 +264,30 @@ async function searchResults(keyword) {
     const anRaw = (an.metas || []).filter(function (it) { return it && it.id; });
 
     // When ANIME_FROM_KITSU_ONLY: drop Cinemeta entries that are the same show
-    // as a Kitsu hit. Titles differ across the two systems (e.g. "Sousou no
-    // Frieren" vs "Beyond Journey's End"), so match on the Animation genre + a
-    // shared release year (or title), which the Kitsu lane already surfaced.
-    const ktYears = {}, ktTitles = {};
-    anRaw.forEach(function (it) {
-      const y = yearOf(it.releaseInfo); if (y) ktYears[y] = 1;
-      const t = normTitle(it.name); if (t) ktTitles[t] = 1;
-    });
+    // as a Kitsu hit. Cinemeta's search metas carry no genres, so we can't gate
+    // on "Animation" — instead fetch each Kitsu hit's /meta (which carries its
+    // imdb_id and English title/aliases) and drop any Cinemeta entry whose IMDb
+    // id OR normalized title matches. ID match is exact; the title set catches
+    // the rest even when the two systems name the show differently.
+    const dropIds = {}, dropTitles = {};
+    if (ANIME_FROM_KITSU_ONLY && anRaw.length) {
+      const probe = anRaw.slice(0, 15);
+      const metas = await Promise.all(probe.map(function (it) {
+        const type = (it.type === "movie") ? "movie" : "series";
+        return getJSON(KITSU + "/meta/" + type + "/" + it.id + ".json").catch(function () { return null; });
+      }));
+      metas.forEach(function (d, idx) {
+        const m = (d && d.meta) || {};
+        const imdb = m.imdb_id || (m.id && String(m.id).indexOf("tt") === 0 ? m.id : "");
+        if (imdb) dropIds[imdb] = 1;
+        [m.name].concat(m.aliases || [], [anRaw[idx] && anRaw[idx].name]).forEach(function (nm) {
+          const t = normTitle(nm); if (t) dropTitles[t] = 1;
+        });
+      });
+    }
     const isAnimeDupe = function (it) {
       if (!ANIME_FROM_KITSU_ONLY) return false;
-      const genres = (it.genres || []).map(function (g) { return String(g).toLowerCase(); });
-      if (genres.indexOf("animation") === -1) return false;
-      return (yearOf(it.releaseInfo) && ktYears[yearOf(it.releaseInfo)]) || !!ktTitles[normTitle(it.name)];
+      return !!dropIds[it.id] || !!dropTitles[normTitle(it.name)];
     };
 
     let dropped = 0;
