@@ -358,15 +358,14 @@ async function extractStreamUrl(url) {
       const sizeL = sizeLabel(s.title);
       const src = sourceOf(s.title);
 
-      // Row: "01. 4K ⚡ • 12.4GB • 👤120 • BluRay [RD]"
+      // Row: "4K • 1337x • 6.59GB • 👤101"  (uncached adds a trailing " • ⬇")
       const bits = [];
-      if (ri.label) bits.push(ri.label + (cache.tag ? " " + cache.tag : ""));
-      else if (cache.tag) bits.push(cache.tag);
+      if (ri.label) bits.push(ri.label);
+      if (src) bits.push(src);
       if (sizeL) bits.push(sizeL);
       if (seeders) bits.push("👤" + seeders);
-      if (src) bits.push(src);
       let title = bits.join(" • ");
-      if (cache.debrid) title += " [" + cache.debrid + "]";
+      if (cache.debrid && !cache.cached) title += " • ⬇";
       if (!title) title = s.name || "Torrentio";
 
       streams.push({
