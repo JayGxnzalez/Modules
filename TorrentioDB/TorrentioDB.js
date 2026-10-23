@@ -112,6 +112,17 @@ function commonPrefix(arr) {
   }
   return p;
 }
+// Pull a season/part marker out of a Kitsu name regardless of language mix:
+// "...Season 3 Part 2" / "...2nd Season" / "...The Final Season" / "...Cour 2",
+// then a trailing roman numeral (II, III, IV...) or bare sequel number (2-9).
+function seasonSuffix(name) {
+  const s = String(name || "").trim();
+  let m = s.match(/((?:the\s+)?final\s+season.*|(?:\d+(?:st|nd|rd|th)\s+season|season\s+\d+|\d+(?:st|nd|rd|th)\s+cour|cour\s+\d+|part\s+\d+)\b.*)$/i);
+  if (m) return m[1].trim();
+  m = s.match(/\s(IX|IV|VIII|VII|VI|V|III|II|[2-9])$/);
+  if (m) return m[1];
+  return "";
+}
 // Debrid cache marker: Torrentio prefixes name with "[RD+]" (cached) or
 // "[RD download]" (uncached) etc. "+]" => cached and instant.
 function cacheInfo(name) {
@@ -276,7 +287,14 @@ async function searchResults(keyword) {
       if (ENGLISH_ANIME_TITLES && imdb && cmNameById[imdb]) {
         name = cmNameById[imdb];
         if (imdbCount[imdb] > 1) {
-          const suffix = String(it.name || "").slice((imdbPrefix[imdb] || "").length).replace(/^[\s:._\-–—]+/, "").trim();
+          // Prefer a parsed season marker (language-agnostic); else fall back to
+          // the common-prefix tail, but only when the group actually shared a
+          // prefix (≥3 chars) so a mixed-language group can't dump a full title.
+          let suffix = seasonSuffix(it.name);
+          if (!suffix) {
+            const pfx = imdbPrefix[imdb] || "";
+            if (pfx.length >= 3) suffix = String(it.name || "").slice(pfx.length).replace(/^[\s:._\-–—]+/, "").trim();
+          }
           if (suffix) name += " " + suffix;
         }
       }
