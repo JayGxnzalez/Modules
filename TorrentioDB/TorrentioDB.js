@@ -269,7 +269,7 @@ async function searchResults(keyword) {
 
     const cmEntry = function (it, type) {
       return {
-        title: it.name + (it.releaseInfo ? " (" + it.releaseInfo + ")" : ""),
+        title: it.name, // year intentionally omitted for cleaner tracker matching
         image: it.poster || "",
         href: CINEMETA + "/meta/" + type + "/" + it.id + ".json#meta=cm:" + type + ":" + it.id
       };
@@ -298,12 +298,11 @@ async function searchResults(keyword) {
           if (suffix) name += " " + suffix;
         }
       }
-      const yr = it.releaseInfo ? (" (" + String(it.releaseInfo).slice(0, 4) + ")") : "";
       // The "— Anime" tag only disambiguates from Cinemeta's anime; with those
       // hidden (ANIME_FROM_KITSU_ONLY) it's redundant, so drop it.
       const tag = ANIME_FROM_KITSU_ONLY ? "" : " — Anime";
       return {
-        title: name + yr + tag,
+        title: name + tag, // year intentionally omitted for cleaner tracker matching
         image: it.poster || "",
         href: KITSU + "/meta/" + type + "/" + it.id + ".json#meta=kt:" + type + ":" + it.id
       };
