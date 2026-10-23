@@ -100,6 +100,18 @@ function audioTag(hayRaw) {
 }
 
 function normTitle(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+function commonPrefix(arr) {
+  if (!arr || !arr.length) return "";
+  let p = arr[0] || "";
+  for (let i = 1; i < arr.length; i++) {
+    const s = arr[i] || "";
+    let j = 0;
+    while (j < p.length && j < s.length && p.charAt(j) === s.charAt(j)) j++;
+    p = p.slice(0, j);
+    if (!p) break;
+  }
+  return p;
+}
 // Debrid cache marker: Torrentio prefixes name with "[RD+]" (cached) or
 // "[RD download]" (uncached) etc. "+]" => cached and instant.
 function cacheInfo(name) {
@@ -255,9 +267,19 @@ async function searchResults(keyword) {
       // Kitsu metas carry type movie|series; default to series.
       const type = (it.type === "movie") ? "movie" : "series";
       // Prefer the English title (Cinemeta's name for the matched IMDb id) over
-      // the romaji Kitsu name; fall back to the Kitsu name when unmatched.
+      // the romaji Kitsu name; fall back to the Kitsu name when unmatched. When
+      // several Kitsu seasons share one IMDb id, keep them distinct by appending
+      // the part of the Kitsu name after the group's common prefix (e.g. the
+      // "Season 2" / "The Final Season" tail).
       const imdb = (idx != null && idx < ktImdb.length) ? ktImdb[idx] : "";
-      const name = (ENGLISH_ANIME_TITLES && imdb && cmNameById[imdb]) ? cmNameById[imdb] : it.name;
+      let name = it.name;
+      if (ENGLISH_ANIME_TITLES && imdb && cmNameById[imdb]) {
+        name = cmNameById[imdb];
+        if (imdbCount[imdb] > 1) {
+          const suffix = String(it.name || "").slice((imdbPrefix[imdb] || "").length).replace(/^[\s:._\-–—]+/, "").trim();
+          if (suffix) name += " " + suffix;
+        }
+      }
       const yr = it.releaseInfo ? (" (" + String(it.releaseInfo).slice(0, 4) + ")") : "";
       // The "— Anime" tag only disambiguates from Cinemeta's anime; with those
       // hidden (ANIME_FROM_KITSU_ONLY) it's redundant, so drop it.
@@ -285,6 +307,7 @@ async function searchResults(keyword) {
     // Kitsu hit (id match is exact; the title set catches differently-named ones).
     const ktImdb = [];
     const dropIds = {}, dropTitles = {};
+    const imdbCount = {}, imdbNames = {}, imdbPrefix = {};
     if ((ENGLISH_ANIME_TITLES || ANIME_FROM_KITSU_ONLY) && anRaw.length) {
       const probe = anRaw.slice(0, 15);
       const metas = await Promise.all(probe.map(function (it) {
@@ -300,6 +323,14 @@ async function searchResults(keyword) {
           const t = normTitle(nm); if (t) dropTitles[t] = 1;
         });
       });
+      // Group anime by shared IMDb id (seasons of one series) and find each
+      // group's common Kitsu-name prefix, so seasons keep a distinct suffix.
+      ktImdb.forEach(function (id, i) {
+        if (!id) return;
+        imdbCount[id] = (imdbCount[id] || 0) + 1;
+        (imdbNames[id] = imdbNames[id] || []).push((anRaw[i] && anRaw[i].name) || "");
+      });
+      Object.keys(imdbNames).forEach(function (id) { imdbPrefix[id] = commonPrefix(imdbNames[id]); });
     }
     const isAnimeDupe = function (it) {
       if (!ANIME_FROM_KITSU_ONLY) return false;
