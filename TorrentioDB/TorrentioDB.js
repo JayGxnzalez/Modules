@@ -13,9 +13,16 @@ const CACHED_ONLY   = false; // true = hide uncached results (debrid must downlo
                              // those first). false keeps them, tagged "⬇".
 const MIN_RES       = 0;     // e.g. 720 to hide anything under 720p. 0 = all.
 const MIN_SEEDERS   = 0;     // e.g. 3 to hide near-dead torrents. 0 = all.
-const MAX_RESULTS   = 40;    // picker cap.
+const MAX_RESULTS   = 60;    // picker cap.
 const SUBS_ENABLED  = true;  // OpenSubtitles for movies/series (anime relies on
                              // the release's own embedded subs).
+const ANIME_FROM_KITSU_ONLY = true; // true = anime comes only from the Kitsu
+                             // lane (Cinemeta's anime dupes hidden, and the
+                             // "— Anime" tag dropped since it's unambiguous).
+                             // false = show both; Kitsu ones keep "— Anime".
+const PREFER_DUBBED_ANIME = false; // true = for anime, show only Dual/Multi/
+                             // Dubbed releases (hide Japanese-only). false =
+                             // show everything. Best-effort (reads release name).
 
 const CINEMETA = "https://v3-cinemeta.strem.io";
 const KITSU     = "https://anime-kitsu.strem.fun";
@@ -71,6 +78,25 @@ function sourceOf(str) {
   const m = String(str || "").match(/⚙️\s*([^\n👤💾🌐]+)/);
   return m ? m[1].trim() : "";
 }
+
+// Best-effort audio tag from the release name + any language-flag emojis
+// Torrentio appends. "Dual"/"Multi" = multiple audio tracks (how anime ships an
+// English dub); "Dub" = an explicit English dub. Returns "" when none detected.
+const FLAG_RE = /[\u{1F1E6}-\u{1F1FF}]{2}/gu;
+function audioTag(hayRaw) {
+  const s = String(hayRaw || "");
+  const low = s.toLowerCase();
+  const flags = {};
+  (s.match(FLAG_RE) || []).forEach(function (f) { flags[f] = 1; });
+  const nFlags = Object.keys(flags).length;
+  if (/\bmulti[\s._-]*audio\b/.test(low) || nFlags >= 3) return "Multi";
+  if (/\bdual[\s._-]*audio\b/.test(low) || /\bdual\b/.test(low) || nFlags === 2) return "Dual";
+  if (/\beng(?:lish)?[\s._-]*dub(?:bed)?\b/.test(low) || /\bdubbed\b/.test(low) || /\bdub\b/.test(low)) return "Dub";
+  return "";
+}
+
+function normTitle(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+function yearOf(s) { const m = String(s || "").match(/(19|20)\d{2}/); return m ? m[0] : ""; }
 // Debrid cache marker: Torrentio prefixes name with "[RD+]" (cached) or
 // "[RD download]" (uncached) etc. "+]" => cached and instant.
 function cacheInfo(name) {
@@ -226,16 +252,43 @@ async function searchResults(keyword) {
       // Kitsu metas carry type movie|series; default to series.
       const type = (it.type === "movie") ? "movie" : "series";
       const yr = it.releaseInfo ? (" (" + String(it.releaseInfo).slice(0, 4) + ")") : "";
+      // The "— Anime" tag only disambiguates from Cinemeta's anime; with those
+      // hidden (ANIME_FROM_KITSU_ONLY) it's redundant, so drop it.
+      const tag = ANIME_FROM_KITSU_ONLY ? "" : " — Anime";
       return {
-        title: it.name + yr + " — Anime",
+        title: it.name + yr + tag,
         image: it.poster || "",
         href: KITSU + "/meta/" + type + "/" + it.id + ".json#meta=kt:" + type + ":" + it.id
       };
     };
 
-    const mvList = (mv.metas || []).filter(function (it) { return it && it.id; }).map(function (it) { return cmEntry(it, "movie"); });
-    const srList = (sr.metas || []).filter(function (it) { return it && it.id; }).map(function (it) { return cmEntry(it, "series"); });
-    const anList = (an.metas || []).filter(function (it) { return it && it.id; }).map(ktEntry);
+    const anRaw = (an.metas || []).filter(function (it) { return it && it.id; });
+
+    // When ANIME_FROM_KITSU_ONLY: drop Cinemeta entries that are the same show
+    // as a Kitsu hit. Titles differ across the two systems (e.g. "Sousou no
+    // Frieren" vs "Beyond Journey's End"), so match on the Animation genre + a
+    // shared release year (or title), which the Kitsu lane already surfaced.
+    const ktYears = {}, ktTitles = {};
+    anRaw.forEach(function (it) {
+      const y = yearOf(it.releaseInfo); if (y) ktYears[y] = 1;
+      const t = normTitle(it.name); if (t) ktTitles[t] = 1;
+    });
+    const isAnimeDupe = function (it) {
+      if (!ANIME_FROM_KITSU_ONLY) return false;
+      const genres = (it.genres || []).map(function (g) { return String(g).toLowerCase(); });
+      if (genres.indexOf("animation") === -1) return false;
+      return (yearOf(it.releaseInfo) && ktYears[yearOf(it.releaseInfo)]) || !!ktTitles[normTitle(it.name)];
+    };
+
+    let dropped = 0;
+    const cmKeep = function (it) {
+      if (!it || !it.id) return false;
+      if (isAnimeDupe(it)) { dropped++; return false; }
+      return true;
+    };
+    const mvList = (mv.metas || []).filter(cmKeep).map(function (it) { return cmEntry(it, "movie"); });
+    const srList = (sr.metas || []).filter(cmKeep).map(function (it) { return cmEntry(it, "series"); });
+    const anList = anRaw.map(ktEntry);
 
     // Interleave movie / series / anime so the best of each sits near the top
     // instead of burying one category behind another's full list.
@@ -246,7 +299,8 @@ async function searchResults(keyword) {
       if (i < anList.length) out.push(anList[i]);
     }
     console.log("[torrentio] search '" + keyword + "' -> movies=" + mvList.length +
-                " series=" + srList.length + " anime=" + anList.length + " total=" + out.length);
+                " series=" + srList.length + " anime=" + anList.length +
+                (dropped ? " cinemeta-anime-dropped=" + dropped : "") + " total=" + out.length);
   } catch (e) {
     console.log("[torrentio] search error: " + e);
   }
@@ -328,9 +382,10 @@ async function extractStreamUrl(url) {
   // OpenSubtitles only for IMDb ids (anime/kitsu rely on embedded subs).
   const osId = (streamId.indexOf("tt") === 0) ? streamId : "";
   const osType = route; // movie | series
+  const isAnime = streamId.indexOf("kitsu") === 0;
 
   const streams = [];
-  let skippedUncached = 0, skippedMagnet = 0, belowRes = 0, belowSeed = 0;
+  let skippedUncached = 0, skippedMagnet = 0, belowRes = 0, belowSeed = 0, skippedNonDub = 0;
   let subtitles = [];
 
   try {
@@ -355,16 +410,22 @@ async function extractStreamUrl(url) {
       const cache = cacheInfo(s.name);
       if (CACHED_ONLY && cache.debrid && !cache.cached) { skippedUncached++; return; }
 
+      // Audio tag (Dual/Multi/Dub). With PREFER_DUBBED_ANIME, anime releases
+      // with no dub/dual/multi tag are hidden.
+      const atag = audioTag(hay);
+      if (isAnime && PREFER_DUBBED_ANIME && !atag) { skippedNonDub++; return; }
+
       const sizeL = sizeLabel(s.title);
       const src = sourceOf(s.title);
 
-      // Row: "4K • 1337x • 6.59GB • 👤101"  (uncached adds a trailing " • ⬇")
+      // Row: "4K • 1337x • 6.59GB • 👤101 • Dual"  (uncached adds " • ⬇")
       const bits = [];
       if (ri.label) bits.push(ri.label);
       if (src) bits.push(src);
       if (sizeL) bits.push(sizeL);
       if (seeders) bits.push("👤" + seeders);
       let title = bits.join(" • ");
+      if (atag) title += " • " + atag;
       if (cache.debrid && !cache.cached) title += " • ⬇";
       if (!title) title = s.name || "Torrentio";
 
@@ -398,6 +459,7 @@ async function extractStreamUrl(url) {
     console.log("[torrentio] streams=" + streams.length +
                 (skippedMagnet ? " magnet-skipped=" + skippedMagnet + " (debrid not in URL?)" : "") +
                 (skippedUncached ? " uncached-hidden=" + skippedUncached : "") +
+                (skippedNonDub ? " non-dub-hidden=" + skippedNonDub : "") +
                 (belowRes ? " below-res=" + belowRes : "") +
                 (belowSeed ? " below-seed=" + belowSeed : "") +
                 " subs=" + subtitles.length + " (" + route + "/" + streamId + ")");
