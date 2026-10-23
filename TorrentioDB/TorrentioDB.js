@@ -23,6 +23,10 @@ const ANIME_FROM_KITSU_ONLY = true; // true = anime comes only from the Kitsu
 const PREFER_DUBBED_ANIME = false; // true = for anime, show only Dual/Multi/
                              // Dubbed releases (hide Japanese-only). false =
                              // show everything. Best-effort (reads release name).
+const ENGLISH_ANIME_TITLES = true; // true = show anime under their English title
+                             // (Cinemeta's name for the matched IMDb id) rather
+                             // than the romaji Kitsu title; falls back to the
+                             // Kitsu title when there's no English match.
 
 const CINEMETA = "https://v3-cinemeta.strem.io";
 const KITSU     = "https://anime-kitsu.strem.fun";
@@ -247,15 +251,19 @@ async function searchResults(keyword) {
         href: CINEMETA + "/meta/" + type + "/" + it.id + ".json#meta=cm:" + type + ":" + it.id
       };
     };
-    const ktEntry = function (it) {
+    const ktEntry = function (it, idx) {
       // Kitsu metas carry type movie|series; default to series.
       const type = (it.type === "movie") ? "movie" : "series";
+      // Prefer the English title (Cinemeta's name for the matched IMDb id) over
+      // the romaji Kitsu name; fall back to the Kitsu name when unmatched.
+      const imdb = (idx != null && idx < ktImdb.length) ? ktImdb[idx] : "";
+      const name = (ENGLISH_ANIME_TITLES && imdb && cmNameById[imdb]) ? cmNameById[imdb] : it.name;
       const yr = it.releaseInfo ? (" (" + String(it.releaseInfo).slice(0, 4) + ")") : "";
       // The "— Anime" tag only disambiguates from Cinemeta's anime; with those
       // hidden (ANIME_FROM_KITSU_ONLY) it's redundant, so drop it.
       const tag = ANIME_FROM_KITSU_ONLY ? "" : " — Anime";
       return {
-        title: it.name + yr + tag,
+        title: name + yr + tag,
         image: it.poster || "",
         href: KITSU + "/meta/" + type + "/" + it.id + ".json#meta=kt:" + type + ":" + it.id
       };
@@ -263,14 +271,21 @@ async function searchResults(keyword) {
 
     const anRaw = (an.metas || []).filter(function (it) { return it && it.id; });
 
-    // When ANIME_FROM_KITSU_ONLY: drop Cinemeta entries that are the same show
-    // as a Kitsu hit. Cinemeta's search metas carry no genres, so we can't gate
-    // on "Animation" — instead fetch each Kitsu hit's /meta (which carries its
-    // imdb_id and English title/aliases) and drop any Cinemeta entry whose IMDb
-    // id OR normalized title matches. ID match is exact; the title set catches
-    // the rest even when the two systems name the show differently.
+    // Cinemeta's name by IMDb id (its titles are English), harvested from the
+    // raw results before any dedup drops them — used both to rename anime to
+    // their English title and to detect Cinemeta/Kitsu duplicates.
+    const cmNameById = {};
+    (mv.metas || []).forEach(function (it) { if (it && it.id) cmNameById[it.id] = it.name; });
+    (sr.metas || []).forEach(function (it) { if (it && it.id) cmNameById[it.id] = it.name; });
+
+    // Fetch each Kitsu hit's /meta once — needed for English titles and/or
+    // dedup. It carries the imdb_id that bridges to Cinemeta; ktImdb is index-
+    // aligned to anRaw. Cinemeta's search metas have no genres to gate on, so
+    // dedup instead drops any Cinemeta entry whose IMDb id OR title matches a
+    // Kitsu hit (id match is exact; the title set catches differently-named ones).
+    const ktImdb = [];
     const dropIds = {}, dropTitles = {};
-    if (ANIME_FROM_KITSU_ONLY && anRaw.length) {
+    if ((ENGLISH_ANIME_TITLES || ANIME_FROM_KITSU_ONLY) && anRaw.length) {
       const probe = anRaw.slice(0, 15);
       const metas = await Promise.all(probe.map(function (it) {
         const type = (it.type === "movie") ? "movie" : "series";
@@ -279,6 +294,7 @@ async function searchResults(keyword) {
       metas.forEach(function (d, idx) {
         const m = (d && d.meta) || {};
         const imdb = m.imdb_id || (m.id && String(m.id).indexOf("tt") === 0 ? m.id : "");
+        ktImdb[idx] = imdb;
         if (imdb) dropIds[imdb] = 1;
         [m.name].concat(m.aliases || [], [anRaw[idx] && anRaw[idx].name]).forEach(function (nm) {
           const t = normTitle(nm); if (t) dropTitles[t] = 1;
