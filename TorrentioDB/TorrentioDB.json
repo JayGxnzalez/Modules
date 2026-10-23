@@ -1,0 +1,20 @@
+{
+  "sourceName": "TorrentioDB",
+  "iconUrl": "https://torrentio.strem.fun/images/logo_v1.png",
+  "author": {
+    "name": "Jay",
+    "icon": "https://avatars.githubusercontent.com/JayGxnzalez?s=400",
+    "url": "https://github.com/JayGxnzalez"
+  },
+  "version": "1.0.0",
+  "language": "Multi",
+  "streamType": "MP4",
+  "quality": "2160",
+  "baseUrl": "https://torrentio.strem.fun/",
+  "searchBaseUrl": "https://torrentio.strem.fun/",
+  "scriptUrl": "https://raw.githubusercontent.com/JayGxnzalez/Modules/refs/heads/main/TorrentioDB/TorrentioDB.js",
+  "type": "Movie/TV",
+  "downloadSupport": true,
+  "asyncJS": true,
+  "softsub": true
+}
