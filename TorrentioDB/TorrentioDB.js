@@ -492,20 +492,25 @@ async function extractStreamUrl(url) {
       const sizeL = sizeLabel(s.title);
       const src = sourceOf(s.title);
 
-      // Row: "4K • 1337x • 6.59GB • 👤101 • Dual"  (uncached adds " • ⬇")
-      const bits = [];
-      if (ri.label) bits.push(ri.label);
-      if (src) bits.push(src);
-      if (sizeL) bits.push(sizeL);
-      if (seeders) bits.push("👤" + seeders);
-      let title = bits.join(" • ");
-      if (atag) title += " • " + atag;
-      if (cache.debrid && !cache.cached) title += " • ⬇";
-      if (!title) title = s.name || "Torrentio";
+      // Two-line layout. Bold name = "quality • provider" (never too plain, and
+      // still identifies the stream if the details line doesn't render). Shirox
+      // sorts the picker lexically by it, so the "NN." prefix is added after
+      // sorting. The rest — size • seeders • audio — goes to the details line
+      // Shirox renders underneath (like Stremio/Nuvio).
+      let head = ri.label || "";
+      if (src) head = head ? head + " • " + src : src;
+      if (!head) head = "Torrentio";
+      const detailBits = [];
+      if (src) detailBits.push(src);
+      if (sizeL) detailBits.push(sizeL);
+      if (seeders) detailBits.push("👤" + seeders);
+      if (atag) detailBits.push(atag);
+      if (cache.debrid && !cache.cached) detailBits.push("⬇");
+      const details = detailBits.join(" • ");
 
       streams.push({
-        _rank: ri.rank, _cached: cache.cached ? 1 : 0, _seed: seeders, _size: sizeToGB(s.title),
-        title: title, name: title, quality: ri.label || title,
+        _rank: ri.rank, _cached: cache.cached ? 1 : 0, _seed: seeders, _size: sizeToGB(s.title), _head: head,
+        details: details,
         streamUrl: s.url, url: s.url,
         headers: (s.behaviorHints && s.behaviorHints.proxyHeaders && s.behaviorHints.proxyHeaders.request) || {}
       });
@@ -523,9 +528,9 @@ async function extractStreamUrl(url) {
     streams.forEach(function (s, i) {
       const nn = String(i + 1);
       const pad = nn.length >= width ? nn : new Array(width - nn.length + 1).join("0") + nn;
-      s.title = pad + ". " + s.title;
+      s.title = pad + ". " + s._head;
       s.name = s.title;
-      delete s._rank; delete s._cached; delete s._seed; delete s._size;
+      delete s._rank; delete s._cached; delete s._seed; delete s._size; delete s._head;
     });
 
     subtitles = osSubs || [];
