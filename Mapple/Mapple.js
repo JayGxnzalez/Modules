@@ -65,6 +65,28 @@ const SESSION_JAR = createCookieJar();
 // hits / once and reuses. One bootstrap per session now.
 let _sessionBootstrapped = false;
 let _bootstrapPromise = null;
+// Vercel deployment-skew pin. The site stamps every API call with
+// x-deployment-id and the request token is minted + validated against ONE
+// deployment; without the header our request-token (deployment A) can be
+// routed to deployment B at media-session, which rejects it as "Invalid
+// request token. Please refresh the page." Scrape the id from the homepage's
+// dpl=<uuid> asset query and send it on all API calls so the whole handshake
+// stays on one deployment.
+let _deployId = null;
+function extractDeployId(html, res) {
+    try {
+        const m = String(html || "").match(/dpl=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/);
+        if (m) return m[1];
+    } catch (e) { }
+    try {
+        const h = res && res.headers;
+        if (h && typeof h.get === "function") {
+            const v = h.get("x-deployment-id") || h.get("x-vercel-deployment-url");
+            if (v) return v;
+        }
+    } catch (e) { }
+    return null;
+}
 async function ensureSession() {
     if (_sessionBootstrapped) return SESSION_JAR;
     // Singleton: the subtitle lookup and the stream lookup both call this in
@@ -76,12 +98,14 @@ async function ensureSession() {
             try {
                 const res = await httpGet(`${BASE_URL}/`, { "User-Agent": MBILE_UA, Accept: "text/html" });
                 SESSION_JAR.update(res);
-                await readText(res);
+                const html = await readText(res);
+                const dep = extractDeployId(html, res);
+                if (dep) _deployId = dep;
                 _sessionBootstrapped = true;
             } catch (e) {
                 console.log("[mapple] session bootstrap error: " + e);
             }
-            console.log("[mapple] session cookies=" + SESSION_JAR.count());
+            console.log("[mapple] session cookies=" + SESSION_JAR.count() + " deploy=" + (_deployId || "none"));
         })();
     }
     await _bootstrapPromise;
@@ -110,6 +134,7 @@ async function ensureTmdbKey() {
     const hdr = { "User-Agent": MBILE_UA, Accept: "application/json", Referer: `${BASE_URL}/`, Origin: BASE_URL, "Content-Type": "application/json" };
     const cookie = jar.serialize();
     if (cookie) hdr.Cookie = cookie;
+    if (_deployId) hdr["x-deployment-id"] = _deployId;
     try {
         const res = await httpPost(TMDB_KEY_URL, hdr, "");
         jar.update(res);
@@ -134,6 +159,7 @@ function tmdbHeaders(key) {
     if (key) h["x-api-key"] = key;
     const cookie = SESSION_JAR.serialize();
     if (cookie) h.Cookie = cookie;
+    if (_deployId) h["x-deployment-id"] = _deployId;
     return h;
 }
 
@@ -148,6 +174,8 @@ function resetSession() {
     _tmdbKeyExp = 0;
     _reqToken = null;
     _reqTokenExp = 0;
+    // Keep _deployId: the pin is valid until the site redeploys, and a redeploy
+    // is exactly when we want the retry's fresh GET / to refresh it.
     for (const k in _playCache) { if (_playCache.hasOwnProperty(k)) delete _playCache[k]; }
 }
 
@@ -430,6 +458,7 @@ function buildApiHeaders(referer, isJson, cookie) {
     const headers = { "User-Agent": MBILE_UA, Accept: "*/*", Origin: BASE_URL, Referer: referer };
     if (isJson) headers["Content-Type"] = "application/json";
     if (cookie) headers.Cookie = cookie;
+    if (_deployId) headers["x-deployment-id"] = _deployId;
     // Mapple extended the x-api-key gate to the stream endpoints too (it was
     // /api/tmdb-only when first built), so carry the key on these calls as
     // well. Harmless if an endpoint doesn't require it.
