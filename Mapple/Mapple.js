@@ -180,13 +180,20 @@ const SUBS_ENABLED = true;   // set false to ship streams only
 function needsWebview(url) {
     return String(url || "").indexOf("mapple.fun") > -1;
 }
+let _wvLogged = false;
+function _wvLog(msg) { if (!_wvLogged) { _wvLogged = true; console.log("[mapple] webview transport: " + msg); } }
 async function webviewFetch(url, headers, method, body) {
     try {
-        return await fetchv2(url, headers, method, body, { impersonate: "webview" });
+        const r = await fetchv2(url, headers, method, body, { impersonate: "webview" });
+        _wvLog("5-arg form ran");
+        return r;
     } catch (e) {
         try {
-            return await fetchv2(url, { method: method, headers: headers, body: body, impersonate: "webview" });
+            const r = await fetchv2(url, { method: method, headers: headers, body: body, impersonate: "webview" });
+            _wvLog("options-object form ran (5-arg threw: " + e + ")");
+            return r;
         } catch (e2) {
+            _wvLog("FELL BACK TO PLAIN (both webview forms threw: " + e2 + ")");
             return await fetchv2(url, headers, method, body);
         }
     }
