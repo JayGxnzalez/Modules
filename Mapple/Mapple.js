@@ -441,12 +441,16 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
             mediaId: Number(tmdbId),
             mediaType: mediaType,
             tv_slug: tvSlug,
+            mediaScope: tvSlug, // token now encodes mediaScope; same "S-E" value
             requestToken: requestToken
         };
 
+        // Token-mint + PoW moved from /api/playback-init to /api/media-session
+        // (playback-init now 401s our requestToken as "invalid request token").
+        // Same payload and same PoW/response shape, so only the endpoint changes.
         let lastInitStatus = "?";
         const initPlayback = async function (body) {
-            const response = await httpPost(`${BASE_URL}/api/playback-init`, buildApiHeaders(referer, true, jar.serialize()), JSON.stringify(body));
+            const response = await httpPost(`${BASE_URL}/api/media-session`, buildApiHeaders(referer, true, jar.serialize()), JSON.stringify(body));
             jar.update(response);
             lastInitStatus = response && typeof response.status === "number" ? response.status : "?";
             return await readJson(response);
@@ -469,7 +473,7 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
                 return { requestToken: requestToken, playbackToken: result.token, jar: jar, referer: referer };
             }
         }
-        console.log("[mapple] playback-init failed HTTP " + lastInitStatus + " (cookies=" + jar.count() +
+        console.log("[mapple] media-session failed HTTP " + lastInitStatus + " (cookies=" + jar.count() +
             ", keylen=" + (_tmdbKey ? _tmdbKey.length : 0) + ") resp=" + String(JSON.stringify(result) || "").slice(0, 160));
         return null;
     } catch (e) {
