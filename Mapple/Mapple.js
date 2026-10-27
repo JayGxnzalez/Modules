@@ -714,9 +714,17 @@ async function fetchServerStreams(server, tmdbId, mediaType, tvSlug, session) {
         // otherwise it's [Auto].
         const parsed = await parseMasterPlaylist(streamUrl, server);
         if (parsed && parsed.variants.length) {
-            const has4k = parsed.variants.some(function (v) { return getQualityRank(v.quality) === 10; });
             const multi = parsed.audioCount >= 2;
-            return [buildStream(streamUrl, server, has4k ? "2160p" : "Auto", true, multi)];
+            // Label the single adaptive row with the master's REAL ceiling (its
+            // top variant's resolution) instead of a vague "Auto", so each source
+            // states the best it can actually deliver — [2160p]/[1080p]/[720p].
+            // Falls back to "Auto" only when no variant carried a RESOLUTION tag.
+            let best = "Auto", bestRank = -1;
+            parsed.variants.forEach(function (v) {
+                const r = getQualityRank(v.quality);
+                if (v.quality && v.quality !== "Unknown" && r > bestRank) { bestRank = r; best = v.quality; }
+            });
+            return [buildStream(streamUrl, server, best, true, multi)];
         }
         // Non-master direct stream: 4K only if the URL says so, else Auto. No
         // master to inspect, so no multi-audio claim.
