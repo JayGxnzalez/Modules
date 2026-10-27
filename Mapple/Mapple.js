@@ -169,12 +169,38 @@ const STREMIO_OPENSUBTITLES_URL = "https://opensubtitles-v3.strem.io";
 const SUBS_ENABLED = true;   // set false to ship streams only
 
 // ---- fetch layer ----------------------------------------------------------
-// Shirox native transport. Keep the 4-arg form PenguPlay uses.
+// mapple.fun calls go through the WebView transport (Paul's `impersonate`
+// commit, reanime-proven): a real WKWebView with its OWN persistent cookie jar.
+// Mapple made `_mapple_site` HttpOnly, so our JS jar can't read it (cookies=0)
+// and the default fetchv2 transport doesn't keep it stable across calls — the
+// request token then fails media-session as "invalid request token". WebView
+// holds the cookie across request-token -> media-session like the site does.
+// Scoped to mapple.fun so OpenSubtitles / TMDB-image calls stay on the default
+// transport. 5th-arg options form with the reanime fallbacks for older builds.
+function needsWebview(url) {
+    return String(url || "").indexOf("mapple.fun") > -1;
+}
+async function webviewFetch(url, headers, method, body) {
+    try {
+        return await fetchv2(url, headers, method, body, { impersonate: "webview" });
+    } catch (e) {
+        try {
+            return await fetchv2(url, { method: method, headers: headers, body: body, impersonate: "webview" });
+        } catch (e2) {
+            return await fetchv2(url, headers, method, body);
+        }
+    }
+}
 async function httpGet(url, headers) {
-    return fetchv2(url, headers || {}, "GET", null);
+    const h = headers || {};
+    if (needsWebview(url)) return webviewFetch(url, h, "GET", null);
+    return fetchv2(url, h, "GET", null);
 }
 async function httpPost(url, headers, body) {
-    return fetchv2(url, headers || {}, "POST", body == null ? "" : body);
+    const h = headers || {};
+    const b = body == null ? "" : body;
+    if (needsWebview(url)) return webviewFetch(url, h, "POST", b);
+    return fetchv2(url, h, "POST", b);
 }
 // fetchv2 may or may not expose res.ok/res.status. Treat an unknown status as
 // OK and let a bad body fall through to the JSON catch, rather than discarding
