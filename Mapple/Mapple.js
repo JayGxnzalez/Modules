@@ -58,16 +58,34 @@ const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
 // stays 0, fetchv2 isn't surfacing Set-Cookie and we move to a webview
 // transport that keeps its own jar (same fix the streams would need).
 const SESSION_JAR = createCookieJar();
+// Track bootstrap with a flag, NOT the cookie count: fetchv2 doesn't always
+// surface Set-Cookie to our jar (count stays 0 while fetchv2 holds the cookie
+// internally). Gating on count() meant GET / ran on every call, rotating the
+// session under the cached request token and breaking its binding — the site
+// hits / once and reuses. One bootstrap per session now.
+let _sessionBootstrapped = false;
+let _bootstrapPromise = null;
 async function ensureSession() {
-    if (SESSION_JAR.count() > 0) return SESSION_JAR;
-    try {
-        const res = await httpGet(`${BASE_URL}/`, { "User-Agent": MBILE_UA, Accept: "text/html" });
-        SESSION_JAR.update(res);
-        await readText(res);
-    } catch (e) {
-        console.log("[mapple] session bootstrap error: " + e);
+    if (_sessionBootstrapped) return SESSION_JAR;
+    // Singleton: the subtitle lookup and the stream lookup both call this in
+    // parallel — without a shared in-flight promise they'd each GET / and mint
+    // two sessions, binding the request token to one while media-session runs
+    // under the other. One bootstrap, shared by all callers.
+    if (!_bootstrapPromise) {
+        _bootstrapPromise = (async function () {
+            try {
+                const res = await httpGet(`${BASE_URL}/`, { "User-Agent": MBILE_UA, Accept: "text/html" });
+                SESSION_JAR.update(res);
+                await readText(res);
+                _sessionBootstrapped = true;
+            } catch (e) {
+                console.log("[mapple] session bootstrap error: " + e);
+            }
+            console.log("[mapple] session cookies=" + SESSION_JAR.count());
+        })();
     }
-    console.log("[mapple] session cookies=" + SESSION_JAR.count());
+    await _bootstrapPromise;
+    _bootstrapPromise = null;
     return SESSION_JAR;
 }
 
@@ -125,6 +143,7 @@ function tmdbHeaders(key) {
 // everything gated by it starts 401ing until a full app kill.
 function resetSession() {
     SESSION_JAR.clear();
+    _sessionBootstrapped = false;
     _tmdbKey = null;
     _tmdbKeyExp = 0;
     _reqToken = null;
@@ -455,7 +474,7 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
             _reqToken = tokenData && tokenData.token;
             if (!_reqToken) { console.log("[mapple] no request token (cookies=" + jar.count() + ")"); return null; }
             _reqTokenExp = now + REQ_TOKEN_TTL;
-            console.log("[mapple] request-token minted (jwt=" + (String(_reqToken).split(".").length === 3) + ", cookies=" + jar.count() + ")");
+            console.log("[mapple] request-token minted (len=" + String(_reqToken).length + ", cookies=" + jar.count() + ")");
         }
         const requestToken = _reqToken;
 
