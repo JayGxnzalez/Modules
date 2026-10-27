@@ -73,6 +73,18 @@ async function ensureSession() {
 
 let _tmdbKey = null;
 let _tmdbKeyExp = 0;
+
+// Session caching. Mapple's requestToken is a JWT valid ~6h and is reused by
+// the site across every title — minting a fresh one per call (as the app fires
+// stream requests for many titles) hammers /api/request-token into a 429 AND
+// breaks the token<->session binding (media-session then rejects it as
+// "invalid request token"). So mint once, reuse, and cache the per-title
+// playback token briefly to skip re-solving the PoW on repeat calls.
+let _reqToken = null;
+let _reqTokenExp = 0;
+const REQ_TOKEN_TTL = 5 * 3600 * 1000;   // under the JWT's ~6h expiry
+const _playCache = {};                    // "type:id:scope" -> { token, at }
+const PLAY_TTL = 10 * 60 * 1000;
 async function ensureTmdbKey() {
     const now = Date.now();
     if (_tmdbKey && now < _tmdbKeyExp - 5000) return _tmdbKey;
@@ -115,6 +127,9 @@ function resetSession() {
     SESSION_JAR.clear();
     _tmdbKey = null;
     _tmdbKeyExp = 0;
+    _reqToken = null;
+    _reqTokenExp = 0;
+    for (const k in _playCache) { if (_playCache.hasOwnProperty(k)) delete _playCache[k]; }
 }
 
 async function tmdbGet(url) {
@@ -429,13 +444,27 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
     try {
         const jar = await ensureSession();
         await ensureTmdbKey(); // stream endpoints now need x-api-key too
+        const now = Date.now();
 
-        const tokenResponse = await httpPost(`${BASE_URL}/api/request-token`, buildApiHeaders(referer, true, jar.serialize()), "");
-        jar.update(tokenResponse);
-        if (!statusOk(tokenResponse)) { console.log("[mapple] request-token HTTP " + (tokenResponse && tokenResponse.status)); return null; }
-        const tokenData = await readJson(tokenResponse);
-        const requestToken = tokenData && tokenData.token;
-        if (!requestToken) { console.log("[mapple] no request token (cookies=" + jar.count() + ")"); return null; }
+        // Reuse the cached request token across titles (one mint per session).
+        if (!_reqToken || now >= _reqTokenExp) {
+            const tokenResponse = await httpPost(`${BASE_URL}/api/request-token`, buildApiHeaders(referer, true, jar.serialize()), "");
+            jar.update(tokenResponse);
+            if (!statusOk(tokenResponse)) { console.log("[mapple] request-token HTTP " + (tokenResponse && tokenResponse.status)); return null; }
+            const tokenData = await readJson(tokenResponse);
+            _reqToken = tokenData && tokenData.token;
+            if (!_reqToken) { console.log("[mapple] no request token (cookies=" + jar.count() + ")"); return null; }
+            _reqTokenExp = now + REQ_TOKEN_TTL;
+            console.log("[mapple] request-token minted (jwt=" + (String(_reqToken).split(".").length === 3) + ", cookies=" + jar.count() + ")");
+        }
+        const requestToken = _reqToken;
+
+        // Reuse the per-title playback token briefly to skip re-PoW on repeats.
+        const pkey = (mediaType === "tv" ? "tv" : "movie") + ":" + tmdbId + ":" + tvSlug;
+        const cachedPlay = _playCache[pkey];
+        if (cachedPlay && (now - cachedPlay.at) < PLAY_TTL) {
+            return { requestToken: requestToken, playbackToken: cachedPlay.token, jar: jar, referer: referer };
+        }
 
         const payload = {
             mediaId: Number(tmdbId),
@@ -458,6 +487,7 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
 
         let result = await initPlayback(payload);
         if (result && result.success && result.token) {
+            _playCache[pkey] = { token: result.token, at: now };
             console.log("[mapple] session ready (cookies=" + jar.count() + ", no PoW)");
             return { requestToken: requestToken, playbackToken: result.token, jar: jar, referer: referer };
         }
@@ -469,6 +499,7 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
                 pow: { challengeId: result.pow.challengeId, nonce: nonce }
             }));
             if (result && result.token) {
+                _playCache[pkey] = { token: result.token, at: now };
                 console.log("[mapple] session ready (cookies=" + jar.count() + ", PoW solved)");
                 return { requestToken: requestToken, playbackToken: result.token, jar: jar, referer: referer };
             }
