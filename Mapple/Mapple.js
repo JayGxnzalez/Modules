@@ -363,6 +363,10 @@ function buildApiHeaders(referer, isJson, cookie) {
     const headers = { "User-Agent": MBILE_UA, Accept: "*/*", Origin: BASE_URL, Referer: referer };
     if (isJson) headers["Content-Type"] = "application/json";
     if (cookie) headers.Cookie = cookie;
+    // Mapple extended the x-api-key gate to the stream endpoints too (it was
+    // /api/tmdb-only when first built), so carry the key on these calls as
+    // well. Harmless if an endpoint doesn't require it.
+    if (_tmdbKey) headers["x-api-key"] = _tmdbKey;
     return headers;
 }
 
@@ -424,6 +428,7 @@ async function createSession(tmdbId, mediaType, tvSlug, referer) {
 async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
     try {
         const jar = await ensureSession();
+        await ensureTmdbKey(); // stream endpoints now need x-api-key too
 
         const tokenResponse = await httpPost(`${BASE_URL}/api/request-token`, buildApiHeaders(referer, true, jar.serialize()), "");
         jar.update(tokenResponse);
@@ -439,9 +444,11 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
             requestToken: requestToken
         };
 
+        let lastInitStatus = "?";
         const initPlayback = async function (body) {
             const response = await httpPost(`${BASE_URL}/api/playback-init`, buildApiHeaders(referer, true, jar.serialize()), JSON.stringify(body));
             jar.update(response);
+            lastInitStatus = response && typeof response.status === "number" ? response.status : "?";
             return await readJson(response);
         };
 
@@ -462,7 +469,8 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
                 return { requestToken: requestToken, playbackToken: result.token, jar: jar, referer: referer };
             }
         }
-        console.log("[mapple] playback-init failed (cookies=" + jar.count() + ")");
+        console.log("[mapple] playback-init failed HTTP " + lastInitStatus + " (cookies=" + jar.count() +
+            ", keylen=" + (_tmdbKey ? _tmdbKey.length : 0) + ") resp=" + String(JSON.stringify(result) || "").slice(0, 160));
         return null;
     } catch (e) {
         console.log("[mapple] session error: " + e);
