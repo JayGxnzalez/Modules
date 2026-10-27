@@ -528,15 +528,19 @@ async function createSessionOnce(tmdbId, mediaType, tvSlug, referer) {
         const now = Date.now();
 
         // Reuse the cached request token across titles (one mint per session).
+        // The current deployment mints the playback token from /api/ui/session,
+        // NOT /api/request-token (that legacy endpoint still returns a token but
+        // media-session no longer honors it -> "Invalid request token"). Same
+        // response shape: { token, expiresAt, expiresIn, deploymentVersion }.
         if (!_reqToken || now >= _reqTokenExp) {
-            const tokenResponse = await httpPost(`${BASE_URL}/api/request-token`, buildApiHeaders(referer, true, jar.serialize()), "");
+            const tokenResponse = await httpPost(`${BASE_URL}/api/ui/session`, buildApiHeaders(referer, true, jar.serialize()), "");
             jar.update(tokenResponse);
-            if (!statusOk(tokenResponse)) { console.log("[mapple] request-token HTTP " + (tokenResponse && tokenResponse.status)); return null; }
+            if (!statusOk(tokenResponse)) { console.log("[mapple] ui/session HTTP " + (tokenResponse && tokenResponse.status)); return null; }
             const tokenData = await readJson(tokenResponse);
             _reqToken = tokenData && tokenData.token;
-            if (!_reqToken) { console.log("[mapple] no request token (cookies=" + jar.count() + ")"); return null; }
+            if (!_reqToken) { console.log("[mapple] no session token (cookies=" + jar.count() + ")"); return null; }
             _reqTokenExp = now + REQ_TOKEN_TTL;
-            console.log("[mapple] request-token minted (len=" + String(_reqToken).length + ", cookies=" + jar.count() + ")");
+            console.log("[mapple] ui/session token minted (len=" + String(_reqToken).length + ", cookies=" + jar.count() + ")");
         }
         const requestToken = _reqToken;
 
