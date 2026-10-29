@@ -482,7 +482,12 @@ async function searchResults(keyword) {
     // best series sit side by side at the top.
     const toEntry = function (it, type) {
       return {
-        title: it.name + (it.releaseInfo ? " (" + it.releaseInfo + ")" : ""),
+        // Title only — no "(2022)" suffix. The year rode through into the
+        // app's continue-watching and tracking records
+        // (title=DAHMER - Monster: The Jeffrey Dahmer Story (2022)), which
+        // breaks title matching against Simkl. The detail page still shows
+        // the year via `airdate`, so nothing is actually lost from view.
+        title: it.name,
         image: it.poster || "",
         href: CINEMETA + "/meta/" + type + "/" + it.id + ".json"
       };
