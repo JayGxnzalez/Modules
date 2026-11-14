@@ -305,7 +305,7 @@ function mpSignUrl(url) {
     }
 }
 
-const ANIKOTO_BASE = "https://anikototv.to";
+const ANIKOTO_BASE = "https://anikototv.bz";
 const MEGAPLAY = "https://megaplay.buzz";
 const VIDWISH = "https://vidwish.live";
 const VIDTUBE = "https://vidtube.site";
@@ -344,7 +344,7 @@ function buildStreamResult(data, referer) {
 
 // ══════════════════════════════════════════════════════════════════
 // Anikoto site scrape — search, details, episode list, server list.
-// Everything comes directly from anikototv.to, same pattern as every
+// Everything comes directly from anikototv.bz, same pattern as every
 // other module: search the real site, use whatever's actually there.
 // No external ID service (AniList/MAL) involved anywhere in this file.
 // ══════════════════════════════════════════════════════════════════
@@ -377,7 +377,7 @@ class Anikoto {
         const blocks = gridHtml.split('<div class="item ">').slice(1);
         const results = [];
         for (const block of blocks) {
-            const slugMatch = block.match(/href="https:\/\/anikototv\.to\/watch\/([^"\/]+)\/ep-\d+"/);
+            const slugMatch = block.match(/href="https?:\/\/[^"\/]+\/watch\/([^"\/]+)\/ep-\d+"/);
             const tipMatch = block.match(/data-tip="(\d+)"/);
             // Visible anchor text (English title), not data-jp — that
             // attribute holds the Japanese/romaji title.
@@ -417,7 +417,7 @@ class Anikoto {
             return m ? m[1].trim() : "";
         };
 
-        const genres = [...html.matchAll(/<a href="https:\/\/anikototv\.to\/genre\/[^"]*">\s*([^<]+?)\s*<\/a>/g)]
+        const genres = [...html.matchAll(/<a href="https?:\/\/[^"\/]+\/genre\/[^"]*">\s*([^<]+?)\s*<\/a>/g)]
             .slice(0, 6)
             .map(m => m[1].trim())
             .join(", ");
