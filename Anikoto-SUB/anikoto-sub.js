@@ -726,10 +726,10 @@ async function extractStreamUrl(url) {
         // external subtitle tracks — nothing to aggregate from it.
         if (hsub.length) pushStream("HSUB", hsub[0]);
 
-        // Then every softsub server, keeping its own name: "SUB - Vidstream",
-        // "SUB - HD-1", etc. Subtitles/allSubtitles come from these only.
+        // Then every softsub server under its own bare name ("Vidstream",
+        // "HD-1", etc.). Subtitles/allSubtitles come from these only.
         for (const s of sub) {
-            pushStream("SUB - " + s.name, s);
+            pushStream(s.name, s);
             if (!subtitles && s.subtitles) { subtitles = s.subtitles; subtitlesHeaders = s.subtitlesHeaders; }
             if (s.allSubtitles?.length) allSubtitles.push(...s.allSubtitles);
         }
