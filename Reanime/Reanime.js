@@ -1,10 +1,11 @@
-// Re:ANIME (reanime.to) — Shirox streaming source module
+// Re:ANIME (reanime.cz) — Shirox streaming source module
 // Flow: /search/__data.json -> /watch/<slug>/__data.json -> /api/flix/<anilistId>/<ep>
 //       -> flixcloud.cc /e/ embed -> on-device WASM key-derivation + AES-256-CBC -> master.m3u8
 // All decryption is on-device (pure-JS SHA-256 / PBKDF2 / AES + the site's own w_payload WASM).
 // Cloudflare is handled with impersonate (Paul's fetchv2 browser-engine commit).
 
-const BASE_URL = 'https://reanime.to';
+let BASE_URL = 'https://reanime.cz';                                    // current working base; auto-updates if the site moves domains
+const SITE_FALLBACKS = ['https://reanime.cz', 'https://reanime.to'];    // tried in order if a 301-to-homepage move can't be auto-detected from the response
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
 
 function log(m) { try { console.log('[Reanime] ' + m); } catch (_) {} }
@@ -32,6 +33,34 @@ async function soraFetch(url, options = {}) {
   }
 }
 async function fetchJson(url, options = {}) { return parseResponseJson(await soraFetch(url, options)); }
+
+function hostOf(u) { const m = String(u || '').match(/^https?:\/\/[^/]+/i); return m ? m[0] : ''; }
+
+// Self-healing JSON fetch for reanime-site PATHS (pass a path like '/search/__data.json',
+// not a full URL). reanime.to -> reanime.cz was a pure domain move where the old domain
+// 301s every deep path to the NEW domain's homepage, so /watch/..__data.json comes back as
+// homepage HTML and JSON parsing fails. This chases that: if the body isn't JSON, it follows
+// the redirect target reported on the response (auto-discovering ANY new domain), then the
+// known fallbacks, and pins whichever domain actually returns JSON for the rest of the run.
+async function siteJson(path, options) {
+  const opts = options || {};
+  const tried = {};
+  async function attempt(base) {
+    base = hostOf(base);
+    if (!base || tried[base]) return null;
+    tried[base] = 1;
+    const res = await soraFetch(base + path, opts);
+    const data = await parseResponseJson(res);
+    if (data) { BASE_URL = base; return data; }                              // got JSON -> pin this domain
+    const moved = hostOf(res && (res.url || res.finalUrl || res.responseURL)); // where did it 301 to?
+    if (moved && moved !== base) { const d = await attempt(moved); if (d) return d; }
+    return null;
+  }
+  let data = await attempt(BASE_URL);
+  if (data) return data;
+  for (let i = 0; i < SITE_FALLBACKS.length; i++) { data = await attempt(SITE_FALLBACKS[i]); if (data) return data; }
+  return null;
+}
 
 /* ------------------------------------------------------------- byte helpers */
 function base64ToUint8(str) {
@@ -212,7 +241,7 @@ async function resolveEmbed(dataLink) {
 /* -------------------------------------------------------------- module API */
 async function searchResults(keyword) {
   try {
-    const d = await fetchJson(BASE_URL + '/search/__data.json?q=' + encodeURIComponent(keyword));
+    const d = await siteJson('/search/__data.json?q=' + encodeURIComponent(keyword));
     const pd = pageData(d);
     const results = (pd && (pd.initial && pd.initial.results || pd.results)) || [];
     return JSON.stringify(results.map(it => {
@@ -230,7 +259,7 @@ async function extractDetails(url) {
   try {
     const mm = url.match(/\/(?:watch|anime)\/([^/?#]+)/);
     if (!mm) return JSON.stringify([{ description: '', aliases: '', airdate: '' }]);
-    const d = await fetchJson(BASE_URL + '/anime/' + mm[1] + '/__data.json');
+    const d = await siteJson('/anime/' + mm[1] + '/__data.json');
     const a = (pageData(d) || {}).anime || {};
     const description = String(a.description || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
     const aliases = Array.isArray(a.synonyms) ? a.synonyms.slice(0, 6).join(', ') : '';
@@ -244,7 +273,7 @@ async function extractEpisodes(url) {
   try {
     const slug = (url.match(/\/watch\/([^/?#]+)/) || [])[1];
     if (!slug) return JSON.stringify([]);
-    const d = await fetchJson(BASE_URL + '/watch/' + slug + '/__data.json?ep=1');
+    const d = await siteJson('/watch/' + slug + '/__data.json?ep=1');
     const pd = pageData(d);
     const eps = (pd && pd.episodes) || [];
     const out = [];
@@ -262,12 +291,12 @@ async function extractStreamUrl(url) {
     const ep = parseInt((url.match(/[?&]ep=(\d+)/) || [])[1] || '1', 10);
     if (!slug) return JSON.stringify({ streams: [] });
 
-    const wd = await fetchJson(BASE_URL + '/watch/' + slug + '/__data.json?ep=' + ep);
+    const wd = await siteJson('/watch/' + slug + '/__data.json?ep=' + ep);
     const pd = pageData(wd);
     const anilist = pd && pd.anime && pd.anime.anilist_id;
     if (!anilist) { log('no anilist_id for ' + slug); return JSON.stringify({ streams: [] }); }
 
-    const flix = await fetchJson(BASE_URL + '/api/flix/' + anilist + '/' + ep);
+    const flix = await siteJson('/api/flix/' + anilist + '/' + ep);
     const servers = (flix && flix.servers) || [];
     if (!servers.length) { log('no servers'); return JSON.stringify({ streams: [] }); }
 
