@@ -170,6 +170,17 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
 .toast.show{opacity:1;transform:translate(-50%,0) scale(1);visibility:visible;
   transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out),visibility 0s}
 .toast svg{width:22px;height:22px;flex:none;color:var(--toast-ic)}
+/* ── count roll ── */
+.count{display:inline-grid;overflow:hidden;vertical-align:top}
+.count>span{grid-area:1/1;white-space:nowrap}
+.count .in{animation:roll-in var(--t-in) var(--ease-out) backwards}
+.count .out{animation:roll-out var(--t-out) var(--ease-out) forwards}
+.count.down .in{animation-name:roll-in-down}
+.count.down .out{animation-name:roll-out-down}
+@keyframes roll-in{from{opacity:0;transform:translateY(70%);filter:blur(3px)}}
+@keyframes roll-out{to{opacity:0;transform:translateY(-70%);filter:blur(3px)}}
+@keyframes roll-in-down{from{opacity:0;transform:translateY(-70%);filter:blur(3px)}}
+@keyframes roll-out-down{to{opacity:0;transform:translateY(70%);filter:blur(3px)}}
 /* ── mobile-native ── */
 button,a,label,select,.chip{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 input[type=search]{font-size:16px} /* below 16px iOS zooms the page on focus */
@@ -194,6 +205,8 @@ input[type=search]{font-size:16px} /* below 16px iOS zooms the page on focus */
   .grid.enter .card,.state,.btn.copy.done{animation:none}
   .btn,.chip,.more,.btn.copy .l,.toast,.toast.show,.theme-toggle,.theme-toggle svg,.card,.totop,.totop.show,.s-clear{transition:none}
   .linkbtn{animation:none}
+  .count .in{animation:none}
+  .count .out{display:none}
   .btn:active,.chip:active,.more:active{transform:none}
 }
 </style>
@@ -466,6 +479,24 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
 }
 
+/* count roll: the old text leaves and the new one arrives, rolling up when the number grows and down when it shrinks */
+function setCount(text) {
+  const box = $("#count"), cur = box.querySelector(".cur");
+  if (cur && cur.textContent === text) return;
+  const next = el("span", "cur", text);
+  if (cur) {
+    const a = parseInt(cur.textContent, 10), b = parseInt(text, 10);
+    box.classList.toggle("down", b < a);
+    cur.className = "out"; cur.setAttribute("aria-hidden", "true");
+    setTimeout(() => cur.remove(), 200);
+    next.classList.add("in");
+  }
+  box.querySelectorAll(".out").forEach(o => { if (o !== cur) o.remove(); });
+  box.textContent = "";
+  if (cur) box.append(cur);
+  box.append(next);
+}
+
 const PR = new Intl.PluralRules("en");
 const modLabel = n => n + (PR.select(n) === "one" ? " module" : " modules");
 
@@ -553,9 +584,9 @@ function render(animate = true) {
     return c;
   }));
   grid.setAttribute("aria-busy", "false");
-  $("#count").textContent = list.length === state.modules.length
+  setCount(list.length === state.modules.length
     ? modLabel(state.modules.length)
-    : list.length + " of " + modLabel(state.modules.length);
+    : list.length + " of " + modLabel(state.modules.length));
   syncControls();
   const empty = $("#state");
   empty.hidden = list.length > 0;
