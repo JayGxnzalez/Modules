@@ -9,31 +9,31 @@
 <style>
 :root{
   --bg:#f6f7f9; --card:#ffffff; --line:#e3e6eb; --fg:#15181d; --dim:#5d6672; --faint:#8a929c;
-  --accent:#e8590c; --accent-bg:#fff0e6; --ok:#1a7f37; --chip:#eef1f5;
+  --accent:#e8590c; --on-accent:#fff; --accent-bg:#fff0e6; --ok:#1a7f37; --chip:#eef1f5;
   --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
   :root{
     --bg:#0d1117; --card:#161b22; --line:#2a313b; --fg:#e6edf3; --dim:#9aa4af; --faint:#6e7781;
-    --accent:#ff8a3d; --accent-bg:#3a1f0d; --ok:#3fb950; --chip:#1f2630;
+    --accent:#ff8a3d; --on-accent:#1f0d02; --accent-bg:#3a1f0d; --ok:#3fb950; --chip:#1f2630;
     --shadow:none; color-scheme:dark;
   }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{margin:0;background:radial-gradient(52rem 26rem at 90% -8%,color-mix(in srgb,var(--accent) 16%,transparent),transparent),radial-gradient(46rem 26rem at -12% 18%,color-mix(in srgb,#5b7cfa 12%,transparent),transparent),var(--bg);background-attachment:fixed;color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--accent)}
 .wrap{max-width:76rem;margin:0 auto;padding:2rem 1.1rem 4rem}
 header h1{font-size:1.7rem;margin:0 0 .3rem;letter-spacing:-.01em}
 header p{margin:0;color:var(--dim);max-width:46rem}
-.how{margin:1.2rem 0 0;padding:.9rem 1rem;background:var(--card);border:1px solid var(--line);border-radius:10px;
+.how{margin:1.2rem 0 0;padding:.9rem 1rem;background:color-mix(in srgb,var(--card) 70%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border:1px solid var(--line);border-radius:10px;
   color:var(--dim);font-size:.9rem;box-shadow:var(--shadow)}
 .how b{color:var(--fg)}
-.tools{position:sticky;top:0;z-index:5;background:var(--bg);padding:1rem 0 .6rem;margin-top:1rem;
+.tools{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 62%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);padding:1rem 0 .6rem;margin-top:1rem;
   display:flex;flex-direction:column;gap:.6rem;border-bottom:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 input[type=search]{flex:1;min-width:14rem;padding:.65rem .8rem;border-radius:9px;border:1px solid var(--line);
-  background:var(--card);color:var(--fg);font:inherit}
+  background:color-mix(in srgb,var(--card) 70%,transparent);color:var(--fg);font:inherit}
 input[type=search]:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 select{padding:.6rem .7rem;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit}
 .chip{display:inline-flex;align-items:center;gap:.35rem;padding:.32rem .75rem;border-radius:999px;border:1px solid var(--line);
@@ -43,8 +43,8 @@ select{padding:.6rem .7rem;border-radius:9px;border:1px solid var(--line);backgr
 .label{color:var(--faint);font-size:.8rem;margin-right:.2rem}
 .count{color:var(--dim);font-size:.88rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:.9rem;margin-top:1rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem;display:flex;flex-direction:column;
-  gap:.6rem;box-shadow:var(--shadow);min-width:0}
+.card{background:color-mix(in srgb,var(--card) 68%,transparent);-webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3);border:1px solid var(--line);border-radius:12px;padding:1rem;display:flex;flex-direction:column;
+  gap:.6rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),var(--shadow);min-width:0}
 .top{display:flex;gap:.8rem;align-items:center;min-width:0}
 .icon{width:48px;height:48px;border-radius:11px;flex:none;object-fit:cover;background:var(--chip);border:1px solid var(--line)}
 .icon.ph{display:grid;place-items:center;font-weight:700;color:var(--dim)}
@@ -56,17 +56,35 @@ select{padding:.6rem .7rem;border-radius:9px;border:1px solid var(--line);backgr
 .changelog{color:var(--dim);font-size:.84rem;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .card.open .changelog{display:block}
 .more{background:none;border:none;color:var(--accent);font:inherit;font-size:.82rem;padding:0;cursor:pointer;align-self:flex-start}
-.actions{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:auto;padding-top:.3rem}
+.actions{display:flex;gap:0;margin-top:auto;padding-top:.3rem}
 .btn{padding:.42rem .75rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);
   font:inherit;font-size:.85rem;cursor:pointer;text-decoration:none}
 .btn:hover{border-color:var(--accent)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.primary{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 78%,#fff),var(--accent));border-color:transparent;color:var(--on-accent);font-weight:600}
+.btn.done,.btn.primary.done{background:var(--ok);border-color:transparent;color:#fff}
 .state{margin-top:2rem;padding:2rem 1rem;text-align:center;color:var(--dim);background:var(--card);border:1px dashed var(--line);border-radius:12px}
 .skeleton{height:12.5rem;border-radius:12px;background:linear-gradient(90deg,var(--card) 25%,var(--chip) 50%,var(--card) 75%);
   background-size:200% 100%;animation:sk 1.2s infinite linear;border:1px solid var(--line)}
 @keyframes sk{to{background-position:-200% 0}}
 footer{margin-top:3rem;color:var(--faint);font-size:.82rem}
+/* ── split button ── */
+.btn.copy{flex:1;min-width:0;border-radius:10px 0 0 10px;padding:.6rem .9rem;font-size:.92rem}
+.btn.mini{flex:none;width:3.1rem;display:grid;place-items:center;padding:0;border-radius:0 10px 10px 0;border-left:0;
+  background:color-mix(in srgb,var(--accent) 14%,color-mix(in srgb,var(--card) 60%,transparent));color:var(--accent);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.btn.mini:hover{background:color-mix(in srgb,var(--accent) 24%,color-mix(in srgb,var(--card) 60%,transparent))}
+.btn svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.copy .l{display:inline-flex;align-items:center;justify-content:center;gap:.5rem}
+/* ── toast ── */
+.toast{position:fixed;left:50%;bottom:max(1.4rem,env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;gap:.6rem;
+  padding:.85rem 1.5rem;border-radius:999px;background:rgba(233,240,251,.88);color:#15181d;font-weight:500;font-size:.95rem;
+  box-shadow:0 8px 28px rgba(0,0,0,.3);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);pointer-events:none;white-space:nowrap;
+  opacity:0;transform:translate(-50%,12px) scale(.95);transform-origin:50% 100%;visibility:hidden;
+  transition:opacity var(--t-out) var(--ease-out),transform var(--t-out) var(--ease-out),visibility 0s linear var(--t-out)}
+.toast.show{opacity:1;transform:translate(-50%,0) scale(1);visibility:visible;
+  transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out),visibility 0s}
+.toast svg{width:22px;height:22px;flex:none;color:#2f855a}
+@media (prefers-color-scheme:light){.toast{background:rgba(21,24,29,.88);color:#fff}.toast svg{color:#3fb950}}
 /* ── motion ── */
 :root{--ease-out:cubic-bezier(.22,1,.36,1);--t-in:220ms;--t-out:180ms}
 .btn,.chip,.more{transition:transform 150ms var(--ease-out),background-color 150ms var(--ease-out),border-color 150ms var(--ease-out),color 150ms var(--ease-out)}
@@ -86,7 +104,7 @@ footer{margin-top:3rem;color:var(--faint);font-size:.82rem}
 @media (prefers-reduced-motion:reduce){
   .skeleton{animation:none}
   .grid.enter .card,.state,.btn.copy.done{animation:none}
-  .btn,.chip,.more,.btn.copy .l{transition:none}
+  .btn,.chip,.more,.btn.copy .l,.toast,.toast.show{transition:none}
   .btn:active,.chip:active,.more:active{transform:none}
 }
 </style>
@@ -113,6 +131,11 @@ footer{margin-top:3rem;color:var(--faint);font-size:.82rem}
   <div class="row" id="cats" aria-label="Categories"><span class="label">Type</span></div>
   <div class="row" id="langs" aria-label="Languages"><span class="label">Language</span></div>
   <div class="count" id="count" aria-live="polite">Loading modules…</div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="m7.8 12.3 2.9 2.9 5.6-6"/></svg>
+  <span id="toastMsg"></span>
 </div>
 
 <main id="grid" class="grid" aria-busy="true"></main>
@@ -294,6 +317,18 @@ function visible() {
   return list;
 }
 
+const ICON_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.3-1.3"/></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+const ICON_CODE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/><path d="m14 5-4 14"/></svg>';
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast");
+  $("#toastMsg").textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
+}
+
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -342,18 +377,23 @@ function card(m) {
   const actions = el("div", "actions");
   const copy = el("button", "btn primary copy");
   copy.type = "button";
-  const l1 = el("span", "l l1", "Copy link"), l2 = el("span", "l l2", "Copied ✓");
+  const l1 = el("span", "l l1"), l2 = el("span", "l l2");
+  l1.innerHTML = ICON_LINK + "<span>Copy link</span>";
+  l2.innerHTML = ICON_CHECK + "<span>Copied</span>";
   l2.setAttribute("aria-hidden", "true");
   copy.append(l1, l2);
   copy.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(m.manifestUrl); }
     catch (e) { window.prompt("Module link:", m.manifestUrl); return; }
+    toast("Module link copied");
     copy.classList.add("done"); l1.setAttribute("aria-hidden", "true"); l2.removeAttribute("aria-hidden");
     setTimeout(() => { copy.classList.remove("done"); l2.setAttribute("aria-hidden", "true"); l1.removeAttribute("aria-hidden"); }, 1600);
   });
-  const json = el("a", "btn", "Manifest"); json.href = m.manifestUrl; json.target = "_blank"; json.rel = "noopener";
-  const code = el("a", "btn", "Code"); code.href = m.folder; code.target = "_blank"; code.rel = "noopener";
-  actions.append(copy, json, code);
+  const mini = el("a", "btn mini");
+  mini.innerHTML = ICON_CODE;
+  mini.href = m.manifestUrl; mini.target = "_blank"; mini.rel = "noopener";
+  mini.title = "Open manifest"; mini.setAttribute("aria-label", "Open manifest");
+  actions.append(copy, mini);
   c.append(actions);
   return c;
 }
