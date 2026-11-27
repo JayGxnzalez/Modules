@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Modules</title>
 <meta name="description" content="Shirox / Sora / Luna modules by JayGxnzalez: anime, movies, shows, manga, live. Copy a module link and paste it into the app.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23e8590c'/%3E%3Cpath d='M50 20Q50 50 80 50Q50 50 50 80Q50 50 20 50Q50 50 50 20Z' fill='none' stroke='white' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='6' fill='white'/%3E%3C/svg%3E">
@@ -30,17 +30,18 @@
     --shadow:none; --toast-bg:rgba(233,240,251,.68); --toast-line:rgba(255,255,255,.4); --toast-fg:#15181d; --toast-ic:#2f855a; --upd:#7aa2ff; --upd-bg:#16264d; color-scheme:dark;
 }
 *{box-sizing:border-box}
+:root{--ring:color-mix(in srgb,var(--fg) 10%,transparent)}
 html{background:var(--bg)}
 /* glow lives on its own fixed layer: iOS Safari repaints background-attachment:fixed whenever layout changes */
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;transform:translateZ(0);
   background:radial-gradient(52rem 26rem at 90% -8%,color-mix(in srgb,var(--accent) 16%,transparent),transparent),radial-gradient(46rem 26rem at -12% 18%,color-mix(in srgb,#5b7cfa 12%,transparent),transparent)}
 body{margin:0;overflow-x:clip;color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--accent)}
-.wrap{max-width:76rem;margin:0 auto;padding:2rem 1.1rem calc(1.2rem + env(safe-area-inset-bottom))}
+.wrap{max-width:76rem;margin:0 auto;padding:2rem max(1.1rem,env(safe-area-inset-right)) calc(1.2rem + env(safe-area-inset-bottom)) max(1.1rem,env(safe-area-inset-left))}
 header h1{font-size:2.3rem;line-height:1.15;font-weight:700;margin:0 0 .5rem;letter-spacing:-.025em}
 header p{margin:0;color:var(--dim);max-width:46rem}
-.how{margin:1.2rem 0 0;padding:.9rem 1rem;background:color-mix(in srgb,var(--card) 70%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border:1px solid var(--line);border-radius:10px;
-  color:var(--dim);font-size:.9rem;box-shadow:var(--shadow)}
+.how{margin:1.2rem 0 0;padding:.9rem 1rem;background:color-mix(in srgb,var(--card) 70%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border:0;border-radius:10px;
+  color:var(--dim);font-size:.9rem;box-shadow:0 0 0 1px var(--ring),var(--shadow)}
 .how b{color:var(--fg)}
 .tools{position:sticky;top:0;z-index:5;padding:1rem 0 1.1rem;margin-top:.6rem;display:flex;flex-direction:column;gap:.6rem}
 /* full-width frosted backdrop with feathered edges, so there is no visible box */
@@ -63,7 +64,6 @@ select{padding:.6rem .7rem;border-radius:9px;border:1px solid var(--line);backgr
 .sortbtn{position:relative;flex:none;width:3rem;display:grid;place-items:center;cursor:pointer;border-radius:9px;border:1px solid var(--line);color:var(--fg);
   background:color-mix(in srgb,var(--card) 70%,transparent);
   transition:transform 150ms var(--ease-out),border-color 150ms var(--ease-out)}
-.sortbtn:hover{border-color:var(--accent)}
 .sortbtn:active{transform:scale(.97)}
 .sortbtn:focus-within{outline:2px solid var(--accent);outline-offset:1px}
 .sortbtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
@@ -82,25 +82,23 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;appeara
 .countrow{gap:.8rem}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:.88rem;cursor:pointer;animation:fade-in 180ms var(--ease-out) both}
 .linkbtn[hidden]{display:none}
-.linkbtn:hover{text-decoration:underline}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:.9rem;margin-top:1rem}
-.card{background:color-mix(in srgb,var(--card) 74%,transparent);border:1px solid var(--line);border-radius:12px;padding:1rem;display:flex;flex-direction:column;
-  gap:.6rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),var(--shadow);min-width:0}
+.card{background:color-mix(in srgb,var(--card) 74%,transparent);border:0;border-radius:12px;padding:calc(1rem + 1px);display:flex;flex-direction:column;
+  gap:.6rem;box-shadow:0 0 0 1px var(--ring),inset 0 1px 0 rgba(255,255,255,.07),var(--shadow);min-width:0}
 .top{display:flex;gap:.8rem;align-items:center;min-width:0}
 .icon{width:48px;height:48px;border-radius:11px;flex:none;object-fit:cover;background:var(--chip);border:1px solid var(--line)}
 .icon.ph{display:grid;place-items:center;font-weight:700;color:var(--dim)}
 .name{font-weight:650;font-size:1.02rem;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta{color:var(--dim);font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badges{display:flex;flex-wrap:wrap;gap:.3rem}
-.badge{font-size:.74rem;padding:.08rem .5rem;border-radius:5px;background:var(--chip);color:var(--dim)}
+.badge{font-size:.74rem;padding:.08rem .5rem;border-radius:5px;background:var(--chip);color:var(--dim);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .badge.cat{background:var(--accent-bg);color:var(--accent)}
-.changelog{color:var(--dim);font-size:.84rem;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.changelog{overflow-wrap:anywhere;color:var(--dim);font-size:.84rem;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .card.open .changelog{display:block}
 .more{background:none;border:none;color:var(--accent);font:inherit;font-size:.82rem;padding:0;cursor:pointer;align-self:flex-start}
 .actions{display:flex;gap:0;margin-top:auto;padding-top:.3rem}
 .btn{padding:.42rem .75rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);
   font:inherit;font-size:.85rem;cursor:pointer;text-decoration:none}
-.btn:hover{border-color:var(--accent)}
 .btn.primary{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 78%,#fff),var(--accent));border-color:transparent;color:var(--on-accent);font-weight:600}
 .btn.done,.btn.primary.done{background:var(--ok);border-color:transparent;color:#fff}
 .state{margin-top:2rem;padding:2rem 1rem;text-align:center;color:var(--dim);background:var(--card);border:1px dashed var(--line);border-radius:12px}
@@ -123,9 +121,12 @@ footer{margin-top:1.6rem;color:var(--faint);font-size:.82rem;text-align:center}
 @media (prefers-reduced-motion:reduce){.visits img{transition:none}}
 /* ── card hover (pointer devices only) ── */
 @media (hover:hover){
-  .card{transition:transform var(--t-in) var(--ease-out),border-color var(--t-in) var(--ease-out),box-shadow var(--t-in) var(--ease-out)}
-  .card:not(.sk):hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 10px 28px color-mix(in srgb,var(--accent) 14%,transparent)}
+  .btn:hover,.sortbtn:hover,.theme-toggle:hover{border-color:var(--accent)}
+  .btn.mini:hover{background:color-mix(in srgb,var(--accent) 24%,color-mix(in srgb,var(--card) 60%,transparent))}
+  .linkbtn:hover{text-decoration:underline}
+  .card{transition:transform var(--t-in) var(--ease-out),box-shadow var(--t-in) var(--ease-out)}
+  .card:not(.sk):hover{transform:translateY(-2px);
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 50%,transparent),inset 0 1px 0 rgba(255,255,255,.07),0 10px 28px color-mix(in srgb,var(--accent) 14%,transparent)}
 }
 /* ── back to top ── */
 .totop{position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1.4rem,env(safe-area-inset-bottom));z-index:15;width:2.9rem;height:2.9rem;
@@ -146,7 +147,6 @@ header h1{padding-right:3.2rem}
   border-radius:999px;border:1px solid var(--line);color:var(--fg);
   background:color-mix(in srgb,var(--card) 60%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
   transition:transform 150ms var(--ease-out),border-color 150ms var(--ease-out)}
-.theme-toggle:hover{border-color:var(--accent)}
 .theme-toggle:active{transform:scale(.97)}
 .theme-toggle svg{grid-area:1/1;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
   transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out),filter var(--t-in) var(--ease-out)}
@@ -159,7 +159,6 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
 .btn.mini{flex:none;width:3.1rem;display:grid;place-items:center;padding:0;border-radius:0 10px 10px 0;border-left:0;
   background:color-mix(in srgb,var(--accent) 14%,color-mix(in srgb,var(--card) 60%,transparent));color:var(--accent);
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
-.btn.mini:hover{background:color-mix(in srgb,var(--accent) 24%,color-mix(in srgb,var(--card) 60%,transparent))}
 .btn svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .btn.copy .l{display:inline-flex;align-items:center;justify-content:center;gap:.5rem}
 /* ── toast ── */
@@ -171,8 +170,11 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
 .toast.show{opacity:1;transform:translate(-50%,0) scale(1);visibility:visible;
   transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out),visibility 0s}
 .toast svg{width:22px;height:22px;flex:none;color:var(--toast-ic)}
+/* ── mobile-native ── */
+button,a,label,select,.chip{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+input[type=search]{font-size:16px} /* below 16px iOS zooms the page on focus */
 /* ── motion ── */
-:root{--ease-out:cubic-bezier(.22,1,.36,1);--t-in:220ms;--t-out:180ms}
+:root{--ease-out:cubic-bezier(.23,1,.32,1);--t-in:220ms;--t-out:180ms}
 .btn,.chip,.more{transition:transform 150ms var(--ease-out),background-color 150ms var(--ease-out),border-color 150ms var(--ease-out),color 150ms var(--ease-out)}
 .btn:active,.chip:active,.more:active{transform:scale(.97)}
 .grid.enter .card{animation:card-in var(--t-in) var(--ease-out) backwards;animation-delay:calc(var(--i,0) * 30ms)}
@@ -464,6 +466,9 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
 }
 
+const PR = new Intl.PluralRules("en");
+const modLabel = n => n + (PR.select(n) === "one" ? " module" : " modules");
+
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -474,7 +479,7 @@ function el(tag, cls, text) {
 function placeholder(name) {
   const n = (name || "?").trim();
   let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) % 360; // stable colour per module name
-  const d = el("div", "icon ph", n.charAt(0).toUpperCase());
+  const d = el("div", "icon ph", (Array.from(n)[0] || "?").toUpperCase()); // Array.from keeps emoji whole
   d.style.background = `linear-gradient(135deg,hsl(${h} 72% 60%),hsl(${(h + 42) % 360} 70% 46%))`;
   d.style.color = "#fff"; d.style.borderColor = "transparent";
   d.setAttribute("aria-hidden", "true");
@@ -549,8 +554,8 @@ function render(animate = true) {
   }));
   grid.setAttribute("aria-busy", "false");
   $("#count").textContent = list.length === state.modules.length
-    ? state.modules.length + " modules"
-    : list.length + " of " + state.modules.length + " modules";
+    ? modLabel(state.modules.length)
+    : list.length + " of " + modLabel(state.modules.length);
   syncControls();
   const empty = $("#state");
   empty.hidden = list.length > 0;
