@@ -67,7 +67,28 @@ select{padding:.6rem .7rem;border-radius:9px;border:1px solid var(--line);backgr
   background-size:200% 100%;animation:sk 1.2s infinite linear;border:1px solid var(--line)}
 @keyframes sk{to{background-position:-200% 0}}
 footer{margin-top:3rem;color:var(--faint);font-size:.82rem}
-@media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
+/* ── motion ── */
+:root{--ease-out:cubic-bezier(.22,1,.36,1);--t-in:220ms;--t-out:180ms}
+.btn,.chip,.more{transition:transform 150ms var(--ease-out),background-color 150ms var(--ease-out),border-color 150ms var(--ease-out),color 150ms var(--ease-out)}
+.btn:active,.chip:active,.more:active{transform:scale(.97)}
+.grid.enter .card{animation:card-in var(--t-in) var(--ease-out) both;animation-delay:calc(var(--i,0) * 30ms)}
+@keyframes card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.state{animation:fade-in var(--t-in) var(--ease-out) both}
+@keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* copy button: label crossfades with scale + blur, success pulse */
+.btn.copy{display:inline-grid;position:relative}
+.btn.copy .l{grid-area:1/1;transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out),filter var(--t-in) var(--ease-out)}
+.btn.copy .l2{opacity:0;transform:scale(.8);filter:blur(4px)}
+.btn.copy.done .l1{opacity:0;transform:scale(.8);filter:blur(4px)}
+.btn.copy.done .l2{opacity:1;transform:none;filter:none}
+.btn.copy.done{animation:pulse 450ms var(--ease-out)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+@media (prefers-reduced-motion:reduce){
+  .skeleton{animation:none}
+  .grid.enter .card,.state,.btn.copy.done{animation:none}
+  .btn,.chip,.more,.btn.copy .l{transition:none}
+  .btn:active,.chip:active,.more:active{transform:none}
+}
 </style>
 </head>
 <body>
@@ -319,13 +340,16 @@ function card(m) {
   }
 
   const actions = el("div", "actions");
-  const copy = el("button", "btn primary", "Copy link");
+  const copy = el("button", "btn primary copy");
   copy.type = "button";
+  const l1 = el("span", "l l1", "Copy link"), l2 = el("span", "l l2", "Copied ✓");
+  l2.setAttribute("aria-hidden", "true");
+  copy.append(l1, l2);
   copy.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(m.manifestUrl); }
     catch (e) { window.prompt("Module link:", m.manifestUrl); return; }
-    copy.textContent = "Copied ✓"; copy.classList.add("done");
-    setTimeout(() => { copy.textContent = "Copy link"; copy.classList.remove("done"); }, 1600);
+    copy.classList.add("done"); l1.setAttribute("aria-hidden", "true"); l2.removeAttribute("aria-hidden");
+    setTimeout(() => { copy.classList.remove("done"); l2.setAttribute("aria-hidden", "true"); l1.removeAttribute("aria-hidden"); }, 1600);
   });
   const json = el("a", "btn", "Manifest"); json.href = m.manifestUrl; json.target = "_blank"; json.rel = "noopener";
   const code = el("a", "btn", "Code"); code.href = m.folder; code.target = "_blank"; code.rel = "noopener";
@@ -334,10 +358,15 @@ function card(m) {
   return c;
 }
 
-function render() {
+function render(animate = true) {
   const list = visible();
   const grid = $("#grid");
-  grid.replaceChildren(...list.map(card));
+  grid.classList.toggle("enter", animate); // no re-animation while typing
+  grid.replaceChildren(...list.map((m, i) => {
+    const c = card(m);
+    c.style.setProperty("--i", Math.min(i, 12)); // 30ms stagger, capped
+    return c;
+  }));
   grid.setAttribute("aria-busy", "false");
   $("#count").textContent = list.length === state.modules.length
     ? state.modules.length + " modules"
@@ -363,8 +392,8 @@ function showState(msg, retry) {
   }
 }
 
-$("#q").addEventListener("input", render);
-$("#sort").addEventListener("change", render);
+$("#q").addEventListener("input", () => render(false));
+$("#sort").addEventListener("change", () => render());
 load();
 </script>
 </body>
