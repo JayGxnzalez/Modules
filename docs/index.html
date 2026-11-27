@@ -36,8 +36,8 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;tr
   background:radial-gradient(52rem 26rem at 90% -8%,color-mix(in srgb,var(--accent) 16%,transparent),transparent),radial-gradient(46rem 26rem at -12% 18%,color-mix(in srgb,#5b7cfa 12%,transparent),transparent)}
 body{margin:0;overflow-x:clip;color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--accent)}
-.wrap{max-width:76rem;margin:0 auto;padding:2rem 1.1rem 4rem}
-header h1{font-size:1.7rem;margin:0 0 .3rem;letter-spacing:-.01em}
+.wrap{max-width:76rem;margin:0 auto;padding:2rem 1.1rem calc(1.2rem + env(safe-area-inset-bottom))}
+header h1{font-size:2.3rem;line-height:1.15;font-weight:700;margin:0 0 .5rem;letter-spacing:-.025em}
 header p{margin:0;color:var(--dim);max-width:46rem}
 .how{margin:1.2rem 0 0;padding:.9rem 1rem;background:color-mix(in srgb,var(--card) 70%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border:1px solid var(--line);border-radius:10px;
   color:var(--dim);font-size:.9rem;box-shadow:var(--shadow)}
@@ -114,8 +114,8 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;appeara
 .sk .txt{height:.7rem;width:94%}.sk .txt2{height:.7rem;width:70%}
 .sk .bar{height:2.45rem;border-radius:10px;margin-top:auto}
 @keyframes sk{to{background-position:-200% 0}}
-footer{margin-top:3rem;color:var(--faint);font-size:.82rem;text-align:center}
-.visits{display:flex;justify-content:center;align-items:center;margin-top:1.4rem;min-height:1.6rem}
+footer{margin-top:1.6rem;color:var(--faint);font-size:.82rem;text-align:center}
+.visits{display:flex;justify-content:center;align-items:center;margin-top:.6rem}
 .visits[hidden]{display:none}
 .visits img{max-width:100%;height:auto;image-rendering:pixelated;opacity:0;transform:translateY(4px);
   transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out)}
@@ -204,7 +204,7 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
     <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg>
   </button>
   <h1>Modules</h1>
-  <p>Every module by <a href="https://github.com/JayGxnzalez">JayGxnzalez</a> for Shirox, Sora, Luna and compatible apps:
+  <p>Modules for Shirox, Sora, Luna and compatible apps:
   anime, movies, shows, manga and live. The list is read straight from GitHub, so it is always up to date.</p>
   <div class="how"><b>Add a module:</b> tap <b>Copy link</b>, then paste it into the app
   (Settings → Modules → Add).</div>
