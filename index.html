@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modules</title>
+<meta name="description" content="Shirox / Sora / Luna modules by JayGxnzalez: anime, movies, shows, manga, live. Copy a module link and paste it into the app.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23e8590c'/%3E%3Cpath d='M50 20Q50 50 80 50Q50 50 50 80Q50 50 20 50Q50 50 50 20Z' fill='none' stroke='white' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='6' fill='white'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6f7f9; --card:#ffffff; --line:#e3e6eb; --fg:#15181d; --dim:#5d6672; --faint:#8a929c;
+  --accent:#e8590c; --accent-bg:#fff0e6; --ok:#1a7f37; --chip:#eef1f5;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0d1117; --card:#161b22; --line:#2a313b; --fg:#e6edf3; --dim:#9aa4af; --faint:#6e7781;
+    --accent:#ff8a3d; --accent-bg:#3a1f0d; --ok:#3fb950; --chip:#1f2630;
+    --shadow:none; color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.wrap{max-width:76rem;margin:0 auto;padding:2rem 1.1rem 4rem}
+header h1{font-size:1.7rem;margin:0 0 .3rem;letter-spacing:-.01em}
+header p{margin:0;color:var(--dim);max-width:46rem}
+.how{margin:1.2rem 0 0;padding:.9rem 1rem;background:var(--card);border:1px solid var(--line);border-radius:10px;
+  color:var(--dim);font-size:.9rem;box-shadow:var(--shadow)}
+.how b{color:var(--fg)}
+.tools{position:sticky;top:0;z-index:5;background:var(--bg);padding:1rem 0 .6rem;margin-top:1rem;
+  display:flex;flex-direction:column;gap:.6rem;border-bottom:1px solid var(--line)}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+input[type=search]{flex:1;min-width:14rem;padding:.65rem .8rem;border-radius:9px;border:1px solid var(--line);
+  background:var(--card);color:var(--fg);font:inherit}
+input[type=search]:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select{padding:.6rem .7rem;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit}
+.chip{display:inline-flex;align-items:center;gap:.35rem;padding:.32rem .75rem;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--fg);font:inherit;font-size:.86rem;cursor:pointer;user-select:none}
+.chip[aria-pressed=true]{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
+.chip .n{color:var(--faint);font-variant-numeric:tabular-nums}
+.label{color:var(--faint);font-size:.8rem;margin-right:.2rem}
+.count{color:var(--dim);font-size:.88rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:.9rem;margin-top:1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem;display:flex;flex-direction:column;
+  gap:.6rem;box-shadow:var(--shadow);min-width:0}
+.top{display:flex;gap:.8rem;align-items:center;min-width:0}
+.icon{width:48px;height:48px;border-radius:11px;flex:none;object-fit:cover;background:var(--chip);border:1px solid var(--line)}
+.icon.ph{display:grid;place-items:center;font-weight:700;color:var(--dim)}
+.name{font-weight:650;font-size:1.02rem;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{color:var(--dim);font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badges{display:flex;flex-wrap:wrap;gap:.3rem}
+.badge{font-size:.74rem;padding:.08rem .5rem;border-radius:5px;background:var(--chip);color:var(--dim)}
+.badge.cat{background:var(--accent-bg);color:var(--accent)}
+.changelog{color:var(--dim);font-size:.84rem;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card.open .changelog{display:block}
+.more{background:none;border:none;color:var(--accent);font:inherit;font-size:.82rem;padding:0;cursor:pointer;align-self:flex-start}
+.actions{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:auto;padding-top:.3rem}
+.btn{padding:.42rem .75rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);
+  font:inherit;font-size:.85rem;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.state{margin-top:2rem;padding:2rem 1rem;text-align:center;color:var(--dim);background:var(--card);border:1px dashed var(--line);border-radius:12px}
+.skeleton{height:12.5rem;border-radius:12px;background:linear-gradient(90deg,var(--card) 25%,var(--chip) 50%,var(--card) 75%);
+  background-size:200% 100%;animation:sk 1.2s infinite linear;border:1px solid var(--line)}
+@keyframes sk{to{background-position:-200% 0}}
+footer{margin-top:3rem;color:var(--faint);font-size:.82rem}
+@media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Modules</h1>
+  <p>Every module by <a href="https://github.com/JayGxnzalez">JayGxnzalez</a> for Shirox, Sora, Luna and compatible apps:
+  anime, movies, shows, manga and live. The list is read straight from GitHub, so it is always up to date.</p>
+  <div class="how"><b>Add a module:</b> tap <b>Copy link</b>, then paste it into the app
+  (Settings → Modules → Add).</div>
+</header>
+
+<div class="tools" role="search">
+  <div class="row">
+    <input type="search" id="q" placeholder="Search a module, site, type…" aria-label="Search modules" autocomplete="off">
+    <select id="sort" aria-label="Sort">
+      <option value="name">Name (A → Z)</option>
+      <option value="lang">Language</option>
+      <option value="version">Newest version</option>
+    </select>
+  </div>
+  <div class="row" id="cats" aria-label="Categories"><span class="label">Type</span></div>
+  <div class="row" id="langs" aria-label="Languages"><span class="label">Language</span></div>
+  <div class="count" id="count" aria-live="polite">Loading modules…</div>
+</div>
+
+<main id="grid" class="grid" aria-busy="true"></main>
+<div id="state" class="state" hidden></div>
+
+<footer>
+  Built in your browser from the GitHub repos (one GitHub API call per repo, then each module's manifest).
+  For educational purposes, not affiliated with any site the modules target.
+</footer>
+</div>
+
+<script>
+"use strict";
+/* ───────────── CONFIG: edit this list ─────────────
+   One entry per repo that holds modules. "branch" defaults to "main".
+   Each module = a manifest .json sitting next to its .js file. */
+const REPOS = [
+  { owner: "JayGxnzalez", repo: "Modules" },
+];
+const CACHE_MINUTES = 30; // GitHub's anonymous API limit is 60 calls/hour per visitor
+
+const EXCLUDED = new Set(["package.json", "package-lock.json", "tsconfig.json", "jsconfig.json", "composer.json", "bower.json", "vercel.json"]);
+const SKIP_DIRS = /^(docs|node_modules|\.github)(\/|$)/;
+
+const CATS = [
+  { key: "anime", label: "Anime", test: t => /anime/.test(t) },
+  { key: "movies", label: "Movies", test: t => /movie|film/.test(t) },
+  { key: "shows", label: "Shows", test: t => /show|serie|tv(?!\w)/.test(t) && !/live/.test(t) },
+  { key: "manga", label: "Manga", test: t => /manga|novel/.test(t) },
+  { key: "live", label: "Live / TV", test: t => /live|vod|sport/.test(t) },
+];
+
+const $ = s => document.querySelector(s);
+const state = { modules: [], cats: new Set(), langs: new Set() };
+
+function dirOf(path) { const i = path.lastIndexOf("/"); return i < 0 ? "" : path.slice(0, i); }
+function encodePath(path) { return path.split("/").map(encodeURIComponent).join("/"); }
+
+function candidates(files) {
+  const jsDirs = new Set(files.filter(p => p.toLowerCase().endsWith(".js")).map(dirOf));
+  return files.filter(p => {
+    if (SKIP_DIRS.test(p)) return false;
+    const name = p.split("/").pop().toLowerCase();
+    return name.endsWith(".json") && !EXCLUDED.has(name) && jsDirs.has(dirOf(p));
+  });
+}
+
+function categoriesOf(type) {
+  const t = String(type || "").toLowerCase();
+  const found = CATS.filter(c => c.test(t)).map(c => c.key);
+  return found.length ? found : ["other"];
+}
+
+function versionKey(v) {
+  return String(v || "0").split(/[.\-]/).map(x => String(parseInt(x, 10) || 0).padStart(5, "0")).join(".");
+}
+
+async function fetchManifest(src, path) {
+  const branch = src.branch || "main";
+  const raw = `https://raw.githubusercontent.com/${src.owner}/${src.repo}/${branch}/`;
+  const url = raw + encodePath(path);
+  try {
+    const r = await fetch(url, { cache: "no-cache" });
+    if (!r.ok) return null;
+    const m = JSON.parse((await r.text()).replace(/^﻿/, ""));
+    const script = m.scriptUrl || m.scriptURL;
+    if (!m || typeof m.sourceName !== "string" || typeof script !== "string") return null;
+    const icon = m.iconUrl || m.iconURL || "";
+    let site = "";
+    try { site = new URL(m.baseUrl || m.baseURL || "").hostname.replace(/^www\./, ""); } catch (e) { /* no site */ }
+    return {
+      name: m.sourceName, version: String(m.version || "?"), language: String(m.language || "?"),
+      type: String(m.type || ""), cats: categoriesOf(m.type), icon, site,
+      author: (m.author && (m.author.name || m.author)) || "", changelog: String(m.changelog || ""),
+      manifestUrl: url, repo: src.repo,
+      folder: `https://github.com/${src.owner}/${src.repo}/tree/${branch}/` + encodePath(dirOf(path)), path,
+    };
+  } catch (e) { return null; }
+}
+
+async function loadRepo(src) {
+  let tree = null, branch = null;
+  for (const b of src.branch ? [src.branch] : ["main", "master"]) {
+    const api = `https://api.github.com/repos/${src.owner}/${src.repo}/git/trees/${b}?recursive=1`;
+    const r = await fetch(api, { headers: { Accept: "application/vnd.github+json" } });
+    if (r.status === 403 || r.status === 429) throw new Error("rate");
+    if (r.ok) { tree = await r.json(); branch = b; break; }
+  }
+  if (!tree) return [];
+  src = { ...src, branch };
+  const files = (tree.tree || []).filter(x => x.type === "blob").map(x => x.path);
+  const paths = candidates(files);
+  const out = [];
+  let next = 0;
+  await Promise.all(Array.from({ length: 8 }, async () => {
+    while (next < paths.length) {
+      const m = await fetchManifest(src, paths[next++]);
+      if (m) out.push(m);
+    }
+  }));
+  // folders holding several manifests (e.g. two versions of one module): label each by its file name
+  const perDir = {};
+  for (const m of out) perDir[dirOf(m.path)] = (perDir[dirOf(m.path)] || 0) + 1;
+  for (const m of out) if (perDir[dirOf(m.path)] > 1) m.variant = m.path.split("/").pop().replace(/\.json$/i, "");
+  return out;
+}
+
+const CACHE_KEY = "modules-v2:" + REPOS.map(r => r.owner + "/" + r.repo).join(",");
+function cacheGet() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    if (c && Date.now() - c.t < CACHE_MINUTES * 60000) return c.modules;
+  } catch (e) { /* storage unavailable */ }
+  return null;
+}
+function cacheSet(modules) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), modules })); } catch (e) { /* ignore */ }
+}
+
+async function load(force) {
+  renderSkeleton();
+  let modules = force ? null : cacheGet();
+  if (!modules) {
+    try {
+      modules = (await Promise.all(REPOS.map(loadRepo))).flat();
+    } catch (e) {
+      return showState(e.message === "rate"
+        ? "GitHub limits rapid visits (60 per hour per connection). Try again in a few minutes."
+        : "Couldn't read the GitHub repos right now. Try again later.", true);
+    }
+    if (modules.length) cacheSet(modules);
+  }
+  state.modules = modules;
+  if (!modules.length) return showState("No modules found.", false);
+  buildFilters();
+  render();
+}
+
+function chip(label, count, onClick) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", "false");
+  b.textContent = label + " ";
+  const n = document.createElement("span"); n.className = "n"; n.textContent = count; b.append(n);
+  b.addEventListener("click", () => { onClick(); b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true"); render(); });
+  return b;
+}
+
+function buildFilters() {
+  const cats = $("#cats"), langs = $("#langs");
+  cats.replaceChildren(Object.assign(document.createElement("span"), { className: "label", textContent: "Type" }));
+  langs.replaceChildren(Object.assign(document.createElement("span"), { className: "label", textContent: "Language" }));
+  state.cats.clear(); state.langs.clear();
+  for (const c of CATS) {
+    const n = state.modules.filter(m => m.cats.includes(c.key)).length;
+    if (n) cats.append(chip(c.label, n, () => toggle(state.cats, c.key)));
+  }
+  const byLang = {};
+  for (const m of state.modules) byLang[m.language] = (byLang[m.language] || 0) + 1;
+  for (const [lang, n] of Object.entries(byLang).sort((a, b) => b[1] - a[1])) {
+    langs.append(chip(lang, n, () => toggle(state.langs, lang)));
+  }
+}
+
+function toggle(set, key) { if (set.has(key)) set.delete(key); else set.add(key); }
+
+function visible() {
+  const q = $("#q").value.trim().toLowerCase();
+  const list = state.modules.filter(m => {
+    if (state.cats.size && !m.cats.some(c => state.cats.has(c))) return false;
+    if (state.langs.size && !state.langs.has(m.language)) return false;
+    if (!q) return true;
+    return [m.name, m.site, m.type, m.language, m.author, m.changelog, m.repo, m.path].join(" ").toLowerCase().includes(q);
+  });
+  const sort = $("#sort").value;
+  const byName = (a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" });
+  list.sort(sort === "lang" ? (a, b) => a.language.localeCompare(b.language) || byName(a, b)
+    : sort === "version" ? (a, b) => versionKey(b.version).localeCompare(versionKey(a.version)) || byName(a, b)
+    : byName);
+  return list;
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+function placeholder(name) {
+  const d = el("div", "icon ph", (name || "?").trim().charAt(0).toUpperCase());
+  d.setAttribute("aria-hidden", "true");
+  return d;
+}
+
+function card(m) {
+  const c = el("article", "card");
+  const top = el("div", "top");
+  if (m.icon) {
+    const img = el("img", "icon"); img.src = m.icon; img.alt = ""; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
+    img.addEventListener("error", () => img.replaceWith(placeholder(m.name)), { once: true });
+    top.append(img);
+  } else top.append(placeholder(m.name));
+  const t = el("div"); t.style.minWidth = "0";
+  t.append(el("h2", "name", m.name));
+  t.append(el("div", "meta", ["v" + m.version, m.language, m.site].filter(Boolean).join(" · ")));
+  top.append(t); c.append(top);
+
+  const badges = el("div", "badges");
+  for (const k of m.cats) {
+    const cat = CATS.find(x => x.key === k);
+    badges.append(el("span", "badge cat", cat ? cat.label : "Other"));
+  }
+  if (m.variant) badges.append(el("span", "badge", m.variant));
+  if (m.author) badges.append(el("span", "badge", m.author));
+  c.append(badges);
+
+  if (m.changelog) {
+    c.append(el("p", "changelog", m.changelog));
+    if (m.changelog.length > 140) {
+      const more = el("button", "more", "Read more");
+      more.type = "button";
+      more.addEventListener("click", () => { const o = c.classList.toggle("open"); more.textContent = o ? "Show less" : "Read more"; });
+      c.append(more);
+    }
+  }
+
+  const actions = el("div", "actions");
+  const copy = el("button", "btn primary", "Copy link");
+  copy.type = "button";
+  copy.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(m.manifestUrl); }
+    catch (e) { window.prompt("Module link:", m.manifestUrl); return; }
+    copy.textContent = "Copied ✓"; copy.classList.add("done");
+    setTimeout(() => { copy.textContent = "Copy link"; copy.classList.remove("done"); }, 1600);
+  });
+  const json = el("a", "btn", "Manifest"); json.href = m.manifestUrl; json.target = "_blank"; json.rel = "noopener";
+  const code = el("a", "btn", "Code"); code.href = m.folder; code.target = "_blank"; code.rel = "noopener";
+  actions.append(copy, json, code);
+  c.append(actions);
+  return c;
+}
+
+function render() {
+  const list = visible();
+  const grid = $("#grid");
+  grid.replaceChildren(...list.map(card));
+  grid.setAttribute("aria-busy", "false");
+  $("#count").textContent = list.length === state.modules.length
+    ? state.modules.length + " modules"
+    : list.length + " of " + state.modules.length + " modules";
+  const empty = $("#state");
+  empty.hidden = list.length > 0;
+  if (!list.length) empty.textContent = "No module matches your search.";
+}
+
+function renderSkeleton() {
+  $("#state").hidden = true;
+  $("#grid").replaceChildren(...Array.from({ length: 9 }, () => el("div", "skeleton")));
+}
+
+function showState(msg, retry) {
+  $("#grid").replaceChildren();
+  $("#count").textContent = "";
+  const s = $("#state"); s.hidden = false; s.textContent = msg;
+  if (retry) {
+    const b = el("button", "btn", "Retry"); b.type = "button"; b.style.marginLeft = ".6rem";
+    b.addEventListener("click", () => load(true));
+    s.append(" ", b);
+  }
+}
+
+$("#q").addEventListener("input", render);
+$("#sort").addEventListener("change", render);
+load();
+</script>
+</body>
+</html>
