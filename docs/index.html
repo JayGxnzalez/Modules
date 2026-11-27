@@ -104,10 +104,9 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;appeara
 .sk .txt{height:.7rem;width:94%}.sk .txt2{height:.7rem;width:70%}
 .sk .bar{height:2.45rem;border-radius:10px;margin-top:auto}
 @keyframes sk{to{background-position:-200% 0}}
-footer{margin-top:3rem;color:var(--faint);font-size:.82rem}
-.visits{display:flex;align-items:center;gap:.6rem;margin-top:1rem;min-height:1.6rem}
+footer{margin-top:3rem;color:var(--faint);font-size:.82rem;text-align:center}
+.visits{display:flex;justify-content:center;align-items:center;margin-top:1.4rem;min-height:1.6rem}
 .visits[hidden]{display:none}
-.visits span{font-size:.78rem;letter-spacing:.04em;text-transform:uppercase}
 .visits img{max-width:100%;height:auto;image-rendering:pixelated;opacity:0;transform:translateY(4px);
   transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out)}
 .visits img.ready{opacity:.9;transform:none}
@@ -235,11 +234,8 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
 </button>
 
 <footer>
-  Built in your browser from the GitHub repos (one GitHub API call per repo, then each module's manifest).
   For educational purposes, not affiliated with any site the modules target.
-  A small visitor counter loads from count.getloli.com.
   <div class="visits" id="visits" hidden>
-    <span>Visits</span>
     <img id="visitsImg" alt="Visitor count" referrerpolicy="no-referrer" decoding="async">
   </div>
 </footer>
@@ -585,7 +581,7 @@ $("#clear").addEventListener("click", () => {
 
 /* visitor counter (Moe Counter): hidden unless the image actually loads */
 (function () {
-  const COUNTER_URL = "https://count.getloli.com/@JayGxnzalez%20Modules?theme=original-new&padding=4&offset=0&align=top&scale=0.7&pixelated=1&darkmode=auto";
+  const COUNTER_URL = "https://count.getloli.com/@JayGxnzalez%20Modules?theme=original-new&padding=4&offset=0&align=top&scale=0.5&pixelated=1&darkmode=auto";
   const img = $("#visitsImg"), box = $("#visits");
   img.addEventListener("load", () => { box.hidden = false; requestAnimationFrame(() => img.classList.add("ready")); });
   img.addEventListener("error", () => box.remove());
