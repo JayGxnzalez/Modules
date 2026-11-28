@@ -80,6 +80,14 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;appeara
 .search.has-value .s-clear{opacity:1;transform:translateY(-50%);visibility:visible;transition:opacity 150ms var(--ease-out),transform 150ms var(--ease-out),visibility 0s}
 .search.has-value .s-clear:active{transform:translateY(-50%) scale(.9)}
 .countrow{gap:.8rem}
+.iconbtn{display:grid;place-items:center;width:1.9rem;height:1.9rem;margin-left:-.5rem;padding:0;border:0;border-radius:999px;background:none;color:var(--faint);cursor:pointer;
+  transition:transform 150ms var(--ease-out),color 150ms var(--ease-out),background-color 150ms var(--ease-out)}
+.iconbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn:active{transform:scale(.97)}
+.iconbtn.spin{color:var(--accent-ink)}
+.iconbtn.spin svg{animation:spin 800ms linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (hover:hover){.iconbtn:hover{color:var(--fg);background:var(--chip)}}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent-ink);font:inherit;font-size:.88rem;cursor:pointer;animation:fade-in 180ms var(--ease-out) both}
 .linkbtn[hidden]{display:none}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:.9rem;margin-top:1rem}
@@ -171,6 +179,7 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
 .toast.show{opacity:1;transform:translate(-50%,0) scale(1);visibility:visible;
   transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out),visibility 0s}
 .toast svg{width:22px;height:22px;flex:none;color:var(--toast-ic)}
+.toast.plain svg{display:none}
 /* ── drawn checks + toast content blur ── */
 @keyframes draw{from{stroke-dashoffset:var(--len)}}
 .toast circle{--len:60;stroke-dasharray:60}
@@ -217,6 +226,8 @@ input[type=search]::placeholder{color:var(--faint);opacity:1} /* below 16px iOS 
   .grid.enter .card,.state,.btn.copy.done{animation:none}
   .btn,.chip,.more,.btn.copy .l,.toast,.toast.show,.theme-toggle,.theme-toggle svg,.card,.totop,.totop.show,.s-clear{transition:none}
   .linkbtn{animation:none}
+  .iconbtn,.iconbtn:active{transition:none}
+  .iconbtn.spin svg{animation:none;opacity:.45}
   .count .in{animation:none}
   .toast.show circle,.toast.show path,.btn.copy.done .l2 path{animation:none}
   .toast>*,.toast.show>*{filter:none;transition:none}
@@ -259,6 +270,9 @@ input[type=search]::placeholder{color:var(--faint);opacity:1} /* below 16px iOS 
   <div class="row" id="langs" aria-label="Languages"><span class="label">Language</span></div>
   <div class="row countrow">
     <span class="count" id="count" aria-live="polite">Loading modules…</span>
+    <button type="button" class="iconbtn" id="refresh" aria-label="Refresh list" title="Refresh list">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+    </button>
     <button type="button" class="linkbtn" id="clear" hidden>Clear filters</button>
   </div>
 </div>
@@ -291,7 +305,7 @@ input[type=search]::placeholder{color:var(--faint);opacity:1} /* below 16px iOS 
 const REPOS = [
   { owner: "JayGxnzalez", repo: "Modules" },
 ];
-const CACHE_MINUTES = 30; // GitHub's anonymous API limit is 60 calls/hour per visitor
+const CACHE_MINUTES = 5; // GitHub keeps its own copy of files ~5 min, so a longer window adds little. API limit: 60 calls/hour per visitor
 
 const EXCLUDED = new Set(["package.json", "package-lock.json", "tsconfig.json", "jsconfig.json", "composer.json", "bower.json", "vercel.json"]);
 const SKIP_DIRS = /^(docs|node_modules|\.github)(\/|$)/;
@@ -329,12 +343,12 @@ function versionKey(v) {
   return String(v || "0").split(/[.\-]/).map(x => String(parseInt(x, 10) || 0).padStart(5, "0")).join(".");
 }
 
-async function fetchManifest(src, path) {
+async function fetchManifest(src, path, fresh) {
   const branch = src.branch || "main";
   const raw = `https://raw.githubusercontent.com/${src.owner}/${src.repo}/${branch}/`;
   const url = raw + encodePath(path);
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, fresh ? { cache: "reload" } : undefined);
     if (!r.ok) return null;
     const m = JSON.parse((await r.text()).replace(/^﻿/, ""));
     const script = m.scriptUrl || m.scriptURL;
@@ -352,11 +366,11 @@ async function fetchManifest(src, path) {
   } catch (e) { return null; }
 }
 
-async function loadRepo(src, onModule) {
+async function loadRepo(src, onModule, fresh) {
   let tree = null, branch = null;
   for (const b of src.branch ? [src.branch] : ["main", "master"]) {
     const api = `https://api.github.com/repos/${src.owner}/${src.repo}/git/trees/${b}?recursive=1`;
-    const r = await fetch(api, { headers: { Accept: "application/vnd.github+json" } });
+    const r = await fetch(api, { headers: { Accept: "application/vnd.github+json" }, cache: fresh ? "reload" : "default" });
     if (r.status === 403 || r.status === 429) throw new Error("rate");
     if (r.ok) { tree = await r.json(); branch = b; break; }
   }
@@ -368,7 +382,7 @@ async function loadRepo(src, onModule) {
   let next = 0;
   await Promise.all(Array.from({ length: 16 }, async () => {
     while (next < paths.length) {
-      const m = await fetchManifest(src, paths[next++]);
+      const m = await fetchManifest(src, paths[next++], fresh);
       if (m) { out.push(m); if (onModule) onModule(m); }
     }
   }));
@@ -413,7 +427,7 @@ async function load(force) {
   await refresh(false);
 }
 
-async function refresh(silent) {
+async function refresh(silent, fresh) {
   const acc = [];
   let timer = 0, shown = false;
   const flush = () => {
@@ -424,20 +438,22 @@ async function refresh(silent) {
   const onModule = silent ? null : m => { acc.push(m); if (!timer) timer = setTimeout(flush, 250); };
   let result;
   try {
-    result = (await Promise.all(REPOS.map(r => loadRepo(r, onModule)))).flat();
+    result = (await Promise.all(REPOS.map(r => loadRepo(r, onModule, fresh)))).flat();
   } catch (e) {
     clearTimeout(timer);
-    if (silent || acc.length) return; // keep whatever is already on screen
-    return showState(e.message === "rate"
+    if (silent || acc.length) return "error"; // keep whatever is already on screen
+    showState(e.message === "rate"
       ? "GitHub limits rapid visits (60 per hour per connection). Try again in a few minutes."
       : "Couldn't read the GitHub repos right now. Try again later.", true);
+    return "error";
   }
   clearTimeout(timer);
-  if (!result.length) { if (!silent) showState("No modules found.", false); return; }
+  if (!result.length) { if (!silent) showState("No modules found.", false); return "error"; }
   cacheSet(result);
-  if (silent && signature(result) === signature(state.modules)) return; // nothing changed
+  if (silent && signature(result) === signature(state.modules)) return "same"; // nothing changed
   markChanges(result);
-  show(result, !shown);
+  show(result, silent ? false : !shown);
+  return "updated";
 }
 
 function chip(label, count, onClick, pressed) {
@@ -516,8 +532,9 @@ function markChanges(mods) {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ok = true) {
   const t = $("#toast");
+  t.classList.toggle("plain", !ok);
   $("#toastMsg").textContent = msg;
   t.classList.add("show");
   clearTimeout(toastTimer);
@@ -711,6 +728,18 @@ $("#clear").addEventListener("click", () => {
   img.addEventListener("error", () => box.remove());
   img.src = COUNTER_URL;
 })();
+
+/* refresh button: skip the saved list and the browser cache, reload from GitHub */
+$("#refresh").addEventListener("click", async () => {
+  const b = $("#refresh");
+  if (b.classList.contains("spin")) return;
+  b.classList.add("spin"); b.setAttribute("aria-busy", "true");
+  const t0 = Date.now();
+  const res = await refresh(true, true);
+  await new Promise(r => setTimeout(r, Math.max(0, 700 - (Date.now() - t0)))); // keep the spin visible long enough to read as feedback
+  b.classList.remove("spin"); b.removeAttribute("aria-busy");
+  toast(res === "updated" ? "Module list updated" : res === "same" ? "Already up to date" : "Couldn't refresh, try again later", res !== "error");
+});
 
 /* back-to-top */
 const totop = $("#totop");
