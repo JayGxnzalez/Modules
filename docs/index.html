@@ -113,7 +113,8 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;appeara
 .sk .bar{height:2.45rem;border-radius:10px;margin-top:auto}
 @keyframes sk{to{background-position:-200% 0}}
 footer{margin-top:1.6rem;color:var(--faint);font-size:.82rem;text-align:center}
-.visits{display:flex;justify-content:center;align-items:center;margin-top:.6rem}
+.visits{display:flex;justify-content:center;align-items:center;margin-bottom:.6rem}
+.disclaimer{margin:0}
 .visits[hidden]{display:none}
 .visits img{max-width:100%;height:auto;image-rendering:pixelated;opacity:0;transform:translateY(4px);
   transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out)}
@@ -275,10 +276,10 @@ input[type=search]::placeholder{color:var(--faint);opacity:1} /* below 16px iOS 
 </button>
 
 <footer>
-  For educational purposes, not affiliated with any site the modules target.
   <div class="visits" id="visits" hidden>
     <img id="visitsImg" alt="Visitor count" referrerpolicy="no-referrer" decoding="async">
   </div>
+  <p class="disclaimer">For educational purposes, not affiliated with any site the modules target.</p>
 </footer>
 </div>
 
@@ -333,7 +334,7 @@ async function fetchManifest(src, path) {
   const raw = `https://raw.githubusercontent.com/${src.owner}/${src.repo}/${branch}/`;
   const url = raw + encodePath(path);
   try {
-    const r = await fetch(url, { cache: "no-cache" });
+    const r = await fetch(url);
     if (!r.ok) return null;
     const m = JSON.parse((await r.text()).replace(/^﻿/, ""));
     const script = m.scriptUrl || m.scriptURL;
@@ -351,7 +352,7 @@ async function fetchManifest(src, path) {
   } catch (e) { return null; }
 }
 
-async function loadRepo(src) {
+async function loadRepo(src, onModule) {
   let tree = null, branch = null;
   for (const b of src.branch ? [src.branch] : ["main", "master"]) {
     const api = `https://api.github.com/repos/${src.owner}/${src.repo}/git/trees/${b}?recursive=1`;
@@ -365,10 +366,10 @@ async function loadRepo(src) {
   const paths = candidates(files);
   const out = [];
   let next = 0;
-  await Promise.all(Array.from({ length: 8 }, async () => {
+  await Promise.all(Array.from({ length: 16 }, async () => {
     while (next < paths.length) {
       const m = await fetchManifest(src, paths[next++]);
-      if (m) out.push(m);
+      if (m) { out.push(m); if (onModule) onModule(m); }
     }
   }));
   // folders holding several manifests (e.g. two versions of one module): label each by its file name
@@ -379,40 +380,69 @@ async function loadRepo(src) {
 }
 
 const CACHE_KEY = "modules-v2:" + REPOS.map(r => r.owner + "/" + r.repo).join(",");
-function cacheGet() {
+function cacheRead() { // returns { t, modules } of any age, or null
   try {
     const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
-    if (c && Date.now() - c.t < CACHE_MINUTES * 60000) return c.modules;
+    if (c && Array.isArray(c.modules) && c.modules.length) return c;
   } catch (e) { /* storage unavailable */ }
   return null;
 }
 function cacheSet(modules) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), modules })); } catch (e) { /* ignore */ }
 }
+const signature = mods => mods.map(m => [m.repo, m.path, m.name, m.version, m.language, m.type, m.icon, m.changelog, m.variant || ""].join("|")).sort().join("\n");
 
-async function load(force) {
-  renderSkeleton();
-  let modules = force ? null : cacheGet();
-  if (!modules) {
-    try {
-      modules = (await Promise.all(REPOS.map(loadRepo))).flat();
-    } catch (e) {
-      return showState(e.message === "rate"
-        ? "GitHub limits rapid visits (60 per hour per connection). Try again in a few minutes."
-        : "Couldn't read the GitHub repos right now. Try again later.", true);
-    }
-    if (modules.length) cacheSet(modules);
-  }
-  markChanges(modules);
+function show(modules, animate = true) {
   state.modules = modules;
-  if (!modules.length) return showState("No modules found.", false);
   buildFilters();
-  render();
+  render(animate);
 }
 
-function chip(label, count, onClick) {
+/* Saved list younger than CACHE_MINUTES: use it as is.
+   Older: show it instantly, then refresh quietly in the background.
+   Nothing saved: fetch, filling cards in as manifests arrive. */
+async function load(force) {
+  const cached = force ? null : cacheRead();
+  if (cached) {
+    markChanges(cached.modules);
+    show(cached.modules);
+    if (Date.now() - cached.t >= CACHE_MINUTES * 60000) refresh(true);
+    return;
+  }
+  renderSkeleton();
+  await refresh(false);
+}
+
+async function refresh(silent) {
+  const acc = [];
+  let timer = 0, shown = false;
+  const flush = () => {
+    timer = 0;
+    if (!acc.length) return;
+    show(acc.slice(), !shown); shown = true;
+  };
+  const onModule = silent ? null : m => { acc.push(m); if (!timer) timer = setTimeout(flush, 250); };
+  let result;
+  try {
+    result = (await Promise.all(REPOS.map(r => loadRepo(r, onModule)))).flat();
+  } catch (e) {
+    clearTimeout(timer);
+    if (silent || acc.length) return; // keep whatever is already on screen
+    return showState(e.message === "rate"
+      ? "GitHub limits rapid visits (60 per hour per connection). Try again in a few minutes."
+      : "Couldn't read the GitHub repos right now. Try again later.", true);
+  }
+  clearTimeout(timer);
+  if (!result.length) { if (!silent) showState("No modules found.", false); return; }
+  cacheSet(result);
+  if (silent && signature(result) === signature(state.modules)) return; // nothing changed
+  markChanges(result);
+  show(result, !shown);
+}
+
+function chip(label, count, onClick, pressed) {
   const b = document.createElement("button");
-  b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", "false");
+  b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", pressed ? "true" : "false");
   b.textContent = label + " ";
   const n = document.createElement("span"); n.className = "n"; n.textContent = count; b.append(n);
   b.addEventListener("click", () => { onClick(); b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true"); render(); });
@@ -423,16 +453,18 @@ function buildFilters() {
   const cats = $("#cats"), langs = $("#langs");
   cats.replaceChildren(Object.assign(document.createElement("span"), { className: "label", textContent: "Type" }));
   langs.replaceChildren(Object.assign(document.createElement("span"), { className: "label", textContent: "Language" }));
-  state.cats.clear(); state.langs.clear();
   for (const c of CATS) {
     const n = state.modules.filter(m => m.cats.includes(c.key)).length;
-    if (n) cats.append(chip(c.label, n, () => toggle(state.cats, c.key)));
+    if (n) cats.append(chip(c.label, n, () => toggle(state.cats, c.key), state.cats.has(c.key)));
   }
   const byLang = {};
   for (const m of state.modules) byLang[m.language] = (byLang[m.language] || 0) + 1;
   for (const [lang, n] of Object.entries(byLang).sort((a, b) => b[1] - a[1])) {
-    langs.append(chip(lang, n, () => toggle(state.langs, lang)));
+    langs.append(chip(lang, n, () => toggle(state.langs, lang), state.langs.has(lang)));
   }
+  // drop selections that no longer exist after a refresh
+  for (const k of [...state.cats]) if (!state.modules.some(m => m.cats.includes(k))) state.cats.delete(k);
+  for (const k of [...state.langs]) if (!byLang[k]) state.langs.delete(k);
 }
 
 function toggle(set, key) { if (set.has(key)) set.delete(key); else set.add(key); }
