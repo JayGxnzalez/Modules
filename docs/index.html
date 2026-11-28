@@ -9,7 +9,7 @@
 <script>try{var t=localStorage.getItem("modules-theme");if(t!=="light"&&t!=="dark")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>
 :root{
-  --bg:#f6f7f9; --card:#ffffff; --line:#e3e6eb; --fg:#15181d; --dim:#5d6672; --faint:#8a929c;
+  --bg:#f6f7f9; --card:#ffffff; --line:#e3e6eb; --fg:#15181d; --dim:#4a535e; --faint:#626b76; --accent-ink:#c2410c;
   --accent:#e8590c; --on-accent:#fff; --accent-bg:#fff0e6; --ok:#1a7f37; --chip:#eef1f5;
   --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
   --toast-bg:rgba(21,24,29,.7); --toast-line:rgba(255,255,255,.14); --toast-fg:#fff; --toast-ic:#3fb950; --upd:#2f5fd0; --upd-bg:#e6edfc;
@@ -18,14 +18,14 @@
 /* no-JS fallback: follow the system */
 @media (prefers-color-scheme:dark){
   :root:not([data-theme]){
-    --bg:#0d1117; --card:#161b22; --line:#2a313b; --fg:#e6edf3; --dim:#9aa4af; --faint:#6e7781;
+    --bg:#0d1117; --card:#161b22; --line:#2a313b; --fg:#e6edf3; --dim:#9aa4af; --faint:#7d8590; --accent-ink:#ff8a3d;
     --accent:#ff8a3d; --on-accent:#1f0d02; --accent-bg:#3a1f0d; --ok:#3fb950; --chip:#1f2630;
     --shadow:none; --toast-bg:rgba(233,240,251,.68); --toast-line:rgba(255,255,255,.4); --toast-fg:#15181d; --toast-ic:#2f855a; --upd:#7aa2ff; --upd-bg:#16264d; color-scheme:dark;
   }
 }
 /* chosen / resolved theme (set by the tiny script in <head>) */
 :root[data-theme=dark]{
-    --bg:#0d1117; --card:#161b22; --line:#2a313b; --fg:#e6edf3; --dim:#9aa4af; --faint:#6e7781;
+    --bg:#0d1117; --card:#161b22; --line:#2a313b; --fg:#e6edf3; --dim:#9aa4af; --faint:#7d8590; --accent-ink:#ff8a3d;
     --accent:#ff8a3d; --on-accent:#1f0d02; --accent-bg:#3a1f0d; --ok:#3fb950; --chip:#1f2630;
     --shadow:none; --toast-bg:rgba(233,240,251,.68); --toast-line:rgba(255,255,255,.4); --toast-fg:#15181d; --toast-ic:#2f855a; --upd:#7aa2ff; --upd-bg:#16264d; color-scheme:dark;
 }
@@ -36,7 +36,7 @@ html{background:var(--bg)}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;transform:translateZ(0);
   background:radial-gradient(52rem 26rem at 90% -8%,color-mix(in srgb,var(--accent) 16%,transparent),transparent),radial-gradient(46rem 26rem at -12% 18%,color-mix(in srgb,#5b7cfa 12%,transparent),transparent)}
 body{margin:0;overflow-x:clip;color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-a{color:var(--accent)}
+a{color:var(--accent-ink)}
 .wrap{max-width:76rem;margin:0 auto;padding:2rem max(1.1rem,env(safe-area-inset-right)) calc(1.2rem + env(safe-area-inset-bottom)) max(1.1rem,env(safe-area-inset-left))}
 header h1{font-size:2.3rem;line-height:1.15;font-weight:700;margin:0 0 .5rem;letter-spacing:-.025em}
 header p{margin:0;color:var(--dim);max-width:46rem}
@@ -55,7 +55,7 @@ input[type=search]:focus,select:focus,button:focus-visible{outline:2px solid var
 select{padding:.6rem .7rem;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit}
 .chip{display:inline-flex;align-items:center;gap:.35rem;padding:.32rem .75rem;border-radius:999px;border:1px solid var(--line);
   background:var(--card);color:var(--fg);font:inherit;font-size:.86rem;cursor:pointer;user-select:none}
-.chip[aria-pressed=true]{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
+.chip[aria-pressed=true]{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-ink)}
 .chip .n{color:var(--faint);font-variant-numeric:tabular-nums}
 .label{color:var(--faint);font-size:.8rem;margin-right:.2rem}
 .count{color:var(--dim);font-size:.88rem}
@@ -80,7 +80,7 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;appeara
 .search.has-value .s-clear{opacity:1;transform:translateY(-50%);visibility:visible;transition:opacity 150ms var(--ease-out),transform 150ms var(--ease-out),visibility 0s}
 .search.has-value .s-clear:active{transform:translateY(-50%) scale(.9)}
 .countrow{gap:.8rem}
-.linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:.88rem;cursor:pointer;animation:fade-in 180ms var(--ease-out) both}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent-ink);font:inherit;font-size:.88rem;cursor:pointer;animation:fade-in 180ms var(--ease-out) both}
 .linkbtn[hidden]{display:none}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:.9rem;margin-top:1rem}
 .card{background:color-mix(in srgb,var(--card) 74%,transparent);border:0;border-radius:12px;padding:calc(1rem + 1px);display:flex;flex-direction:column;
@@ -92,10 +92,10 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;appeara
 .meta{color:var(--dim);font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badges{display:flex;flex-wrap:wrap;gap:.3rem}
 .badge{font-size:.74rem;padding:.08rem .5rem;border-radius:5px;background:var(--chip);color:var(--dim);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.badge.cat{background:var(--accent-bg);color:var(--accent)}
+.badge.cat{background:var(--accent-bg);color:var(--accent-ink)}
 .changelog{overflow-wrap:anywhere;color:var(--dim);font-size:.84rem;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .card.open .changelog{display:block}
-.more{background:none;border:none;color:var(--accent);font:inherit;font-size:.82rem;padding:0;cursor:pointer;align-self:flex-start}
+.more{background:none;border:none;color:var(--accent-ink);font:inherit;font-size:.82rem;padding:0;cursor:pointer;align-self:flex-start}
 .actions{display:flex;gap:0;margin-top:auto;padding-top:.3rem}
 .btn{padding:.42rem .75rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);
   font:inherit;font-size:.85rem;cursor:pointer;text-decoration:none}
@@ -157,7 +157,7 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
 /* ── split button ── */
 .btn.copy{flex:1;min-width:0;border-radius:10px 0 0 10px;padding:.6rem .9rem;font-size:.92rem}
 .btn.mini{flex:none;width:3.1rem;display:grid;place-items:center;padding:0;border-radius:0 10px 10px 0;border-left:0;
-  background:color-mix(in srgb,var(--accent) 14%,color-mix(in srgb,var(--card) 60%,transparent));color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 14%,color-mix(in srgb,var(--card) 60%,transparent));color:var(--accent-ink);
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .btn svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .btn.copy .l{display:inline-flex;align-items:center;justify-content:center;gap:.5rem}
@@ -170,6 +170,16 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
 .toast.show{opacity:1;transform:translate(-50%,0) scale(1);visibility:visible;
   transition:opacity var(--t-in) var(--ease-out),transform var(--t-in) var(--ease-out),visibility 0s}
 .toast svg{width:22px;height:22px;flex:none;color:var(--toast-ic)}
+/* ── drawn checks + toast content blur ── */
+@keyframes draw{from{stroke-dashoffset:var(--len)}}
+.toast circle{--len:60;stroke-dasharray:60}
+.toast path{--len:14;stroke-dasharray:14}
+.toast.show circle{animation:draw 380ms var(--ease-out) 60ms backwards}
+.toast.show path{animation:draw 260ms var(--ease-out) 240ms backwards}
+.btn.copy .l2 path{--len:21;stroke-dasharray:21}
+.btn.copy.done .l2 path{animation:draw 280ms var(--ease-out) 90ms backwards}
+.toast>*{filter:blur(4px);transition:filter var(--t-out) var(--ease-out)}
+.toast.show>*{filter:none;transition:filter var(--t-in) var(--ease-out)}
 /* ── count roll ── */
 .count{display:inline-grid;overflow:hidden;vertical-align:top}
 .count>span{grid-area:1/1;white-space:nowrap}
@@ -183,7 +193,8 @@ html.theming *{transition:background-color 220ms var(--ease-out),color 220ms var
 @keyframes roll-out-down{to{opacity:0;transform:translateY(70%);filter:blur(3px)}}
 /* ── mobile-native ── */
 button,a,label,select,.chip{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-input[type=search]{font-size:16px} /* below 16px iOS zooms the page on focus */
+input[type=search]{font-size:16px}
+input[type=search]::placeholder{color:var(--faint);opacity:1} /* below 16px iOS zooms the page on focus */
 /* ── motion ── */
 :root{--ease-out:cubic-bezier(.23,1,.32,1);--t-in:220ms;--t-out:180ms}
 .btn,.chip,.more{transition:transform 150ms var(--ease-out),background-color 150ms var(--ease-out),border-color 150ms var(--ease-out),color 150ms var(--ease-out)}
@@ -206,6 +217,8 @@ input[type=search]{font-size:16px} /* below 16px iOS zooms the page on focus */
   .btn,.chip,.more,.btn.copy .l,.toast,.toast.show,.theme-toggle,.theme-toggle svg,.card,.totop,.totop.show,.s-clear{transition:none}
   .linkbtn{animation:none}
   .count .in{animation:none}
+  .toast.show circle,.toast.show path,.btn.copy.done .l2 path{animation:none}
+  .toast>*,.toast.show>*{filter:none;transition:none}
   .count .out{display:none}
   .btn:active,.chip:active,.more:active{transform:none}
 }
@@ -497,6 +510,30 @@ function setCount(text) {
   box.append(next);
 }
 
+/* smooth "Read more": animate the height between the 3-line clamp and the full text */
+function animateHeight(p, from, to, ms, done) {
+  p.dataset.busy = "1";
+  p.style.transition = "none"; p.style.height = from + "px"; p.getBoundingClientRect();
+  p.style.transition = `height ${ms}ms var(--ease-out)`; p.style.height = to + "px";
+  let finished = false;
+  const end = () => { if (finished) return; finished = true; p.style.transition = ""; p.style.height = ""; delete p.dataset.busy; if (done) done(); };
+  p.addEventListener("transitionend", e => { if (e.propertyName === "height") end(); }, { once: true });
+  setTimeout(end, ms + 80);
+}
+function expandChangelog(p, c, open) {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const start = p.offsetHeight;
+  if (open) {
+    c.classList.add("open");
+    if (!reduce) animateHeight(p, start, p.scrollHeight, 220);
+  } else if (reduce) {
+    c.classList.remove("open");
+  } else {
+    c.classList.remove("open"); const end = p.offsetHeight; c.classList.add("open"); // measure the clamped height
+    animateHeight(p, start, end, 180, () => c.classList.remove("open"));
+  }
+}
+
 const PR = new Intl.PluralRules("en");
 const modLabel = n => n + (PR.select(n) === "one" ? " module" : " modules");
 
@@ -545,7 +582,13 @@ function card(m) {
     if (m.changelog.length > 140) {
       const more = el("button", "more", "Read more");
       more.type = "button";
-      more.addEventListener("click", () => { const o = c.classList.toggle("open"); more.textContent = o ? "Show less" : "Read more"; });
+      const p = c.querySelector(".changelog");
+      more.addEventListener("click", () => {
+        if (p.dataset.busy) return;
+        const open = !c.classList.contains("open");
+        expandChangelog(p, c, open);
+        more.textContent = open ? "Show less" : "Read more";
+      });
       c.append(more);
     }
   }
